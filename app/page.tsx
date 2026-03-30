@@ -170,7 +170,11 @@ export default function WeekOutApp() {
       {/* CUSTOMIZATION MODAL */}
       {selectedItem && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto">
+          {/* මෙතන තමයි Apple Fix එක දැම්මේ (overscroll-contain සහ WebkitOverflowScrolling) */}
+          <div 
+            className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             <button onClick={() => setSelectedItem(null)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 text-xl font-bold">✕</button>
             <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-6 border-b pb-4">{selectedItem.name[lang]}</h3>
 
