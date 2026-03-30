@@ -44,12 +44,12 @@ export default function DailyReport() {
 
   orders.forEach(order => {
     // Payment totals
-    if (order.paymentMethod === 'Cash on Delivery') {
-      totalCOD += order.totalPrice || 0;
+    if (order.paymentMethod === 'COD') {
+      totalCOD += order.totalAmount || 0;
     } else {
-      totalOnline += order.totalPrice || 0;
+      totalOnline += order.totalAmount || 0;
     }
-    grandTotal += order.totalPrice || 0;
+    grandTotal += order.totalAmount || 0;
 
     // Items calculation
     if (order.items) {
