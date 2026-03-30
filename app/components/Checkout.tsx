@@ -1,7 +1,7 @@
 // app/components/Checkout.tsx
 import { useState } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 
 export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart }: any) {
   const [isCityLimit, setIsCityLimit] = useState(true);
@@ -25,14 +25,31 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
 
     setIsProcessing(true);
 
-    // Online නම් තත්පර 2ක Processing එකක් (Gateway එකට යනව වගේ පෙන්නන්න)
-    if (paymentMethod === 'Online') {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-
     try {
-      // 2. Save to Firebase (100% ක් සේව් වෙනකන් ඉන්නවා)
+      // --- 2. UNIQUE ORDER ID GENERATION (LATEST TECH METHOD) ---
+      const now = new Date();
+      // ශ්‍රී ලංකාවේ වේලාවට අදාළව YYYYMMDD ලබා ගැනීම
+      const dateStr = now.getFullYear() + 
+                      String(now.getMonth() + 1).padStart(2, '0') + 
+                      String(now.getDate()).padStart(2, '0');
+      
+      // අද දිනට අදාළව දැනට ඩේටාබේස් එකේ ඇති ඕඩර් ගණන බැලීම
+      const q = query(collection(db, "orders"), where("orderDateOnly", "==", dateStr));
+      const querySnapshot = await getDocs(q);
+      const nextOrderNum = String(querySnapshot.size + 1).padStart(2, '0');
+      
+      const customOrderID = `wo-${dateStr}-${nextOrderNum}`;
+      // -------------------------------------------------------
+
+      // Online නම් තත්පර 2ක Processing එකක් (Gateway එකට යනව වගේ පෙන්නන්න)
+      if (paymentMethod === 'Online') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // 3. Save to Firebase (ID එකත් එක්කම සේව් කරනවා)
       await addDoc(collection(db, "orders"), {
+        orderID: customOrderID,         // අපේ අලුත් ID එක
+        orderDateOnly: dateStr,         // පස්සේ චෙක් කරන්න ලේසි වෙන්න මේකත් දානවා
         customerName: name,
         phone: phone,
         address: address,
@@ -40,6 +57,7 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         paymentMethod: paymentMethod,
         items: cartItems.map((item: any) => ({
           name: item.name.en,
+          qty: item.qty || 1,           // ප්‍රමාණයත් සේව් කරනවා
           price: item.price,
           details: item.type === 'paratha' 
             ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` 
@@ -48,12 +66,12 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         subTotal: subTotal,
         deliveryFee: deliveryFee,
         totalAmount: finalTotal,
-        createdAt: serverTimestamp(), // රිපෝට් එකට වැඩ කරන්න නම වෙනස් කළා
+        createdAt: serverTimestamp(),
         status: paymentMethod === 'Online' ? "Paid (Pending Gateway)" : "New"
       });
 
-      // 3. Create WhatsApp Message
-      let message = `*🌟 NEW ORDER - WEEK OUT 🌟*\n\n`;
+      // 4. Create WhatsApp Message
+      let message = `*🌟 NEW ORDER: ${customOrderID} 🌟*\n\n`; // ID එක උඩින්ම දැම්මා
       message += `*Customer Details:*\n`;
       message += `👤 Name: ${name}\n`;
       message += `📞 Phone: ${phone}\n`;
@@ -78,13 +96,11 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
           message += `\n_(Note: Online Payment Selected - Send Payment Link)_`;
       }
 
-      // 4. Cart එක හිස් කරලා WhatsApp එකට යවනවා (ෆෝන් වල හිරවෙන එක නැති කරන්න)
+      // 5. Cart එක හිස් කරලා WhatsApp එකට යවනවා
       clearCart();
       
       const whatsappNumber = '94760829235'; 
       const encodedMessage = encodeURIComponent(message);
-      
-      // ෆෝන් එකේ ඇප් එක Suspend වෙන්න කලින් යවන්න _self පාවිච්චි කළා
       window.location.href = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
     } catch (error) {
