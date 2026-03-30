@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 // සටහන: ඔයාගේ Firebase කනෙක්ෂන් එක තියෙන ෆයිල් එක අනුව මේ පේළිය වෙනස් වෙන්න පුළුවන්. 
 // (උදා: import { db } from '../../firebase';)
 import { collection, getDocs } from 'firebase/firestore'; 
-import { db } from '../../firebase'; // <-- මේක ඔයාගේ ඇප් එකේ firebase ෆයිල් එක තියෙන තැනට හදාගන්න
+import { db } from '../firebase'; // <-- මේක ඔයාගේ ඇප් එකේ firebase ෆයිල් එක තියෙන තැනට හදාගන්න
 
 export default function DailyReport() {
   const [orders, setOrders] = useState<any[]>([]);
