@@ -1,7 +1,7 @@
 // app/components/Checkout.tsx
 import { useState } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart }: any) {
   const [isCityLimit, setIsCityLimit] = useState(true);
@@ -17,7 +17,6 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
   const finalTotal = subTotal + deliveryFee;
 
   const handleConfirmOrder = async () => {
-    // 1. Validation
     if (!name || !phone || !address) {
       alert(lang === 'en' ? 'Please fill in all details.' : 'කරුණාකර සියලුම විස්තර පුරවන්න.');
       return;
@@ -26,30 +25,25 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
     setIsProcessing(true);
 
     try {
-      // --- 2. UNIQUE ORDER ID GENERATION (LATEST TECH METHOD) ---
+      // --- නව යුනීක් ඕඩර් නම්බර් එක (WO + YYYYMMDD + HHMM) ---
       const now = new Date();
-      // ශ්‍රී ලංකාවේ වේලාවට අදාළව YYYYMMDD ලබා ගැනීම
-      const dateStr = now.getFullYear() + 
-                      String(now.getMonth() + 1).padStart(2, '0') + 
-                      String(now.getDate()).padStart(2, '0');
+      const datePart = now.getFullYear() + 
+                       String(now.getMonth() + 1).padStart(2, '0') + 
+                       String(now.getDate()).padStart(2, '0');
+      const timePart = String(now.getHours()).padStart(2, '0') + 
+                       String(now.getMinutes()).padStart(2, '0');
       
-      // අද දිනට අදාළව දැනට ඩේටාබේස් එකේ ඇති ඕඩර් ගණන බැලීම
-      const q = query(collection(db, "orders"), where("orderDateOnly", "==", dateStr));
-      const querySnapshot = await getDocs(q);
-      const nextOrderNum = String(querySnapshot.size + 1).padStart(2, '0');
-      
-      const customOrderID = `wo-${dateStr}-${nextOrderNum}`;
+      const customOrderID = `WO-${datePart}${timePart}`;
       // -------------------------------------------------------
 
-      // Online නම් තත්පර 2ක Processing එකක් (Gateway එකට යනව වගේ පෙන්නන්න)
       if (paymentMethod === 'Online') {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
-      // 3. Save to Firebase (ID එකත් එක්කම සේව් කරනවා)
+      // 1. Save to Firebase
       await addDoc(collection(db, "orders"), {
-        orderID: customOrderID,         // අපේ අලුත් ID එක
-        orderDateOnly: dateStr,         // පස්සේ චෙක් කරන්න ලේසි වෙන්න මේකත් දානවා
+        orderID: customOrderID,
+        orderDateOnly: datePart,
         customerName: name,
         phone: phone,
         address: address,
@@ -57,7 +51,7 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         paymentMethod: paymentMethod,
         items: cartItems.map((item: any) => ({
           name: item.name.en,
-          qty: item.qty || 1,           // ප්‍රමාණයත් සේව් කරනවා
+          qty: item.qty || 1,
           price: item.price,
           details: item.type === 'paratha' 
             ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` 
@@ -70,8 +64,8 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         status: paymentMethod === 'Online' ? "Paid (Pending Gateway)" : "New"
       });
 
-      // 4. Create WhatsApp Message
-      let message = `*🌟 NEW ORDER: ${customOrderID} 🌟*\n\n`; // ID එක උඩින්ම දැම්මා
+      // 2. Create WhatsApp Message
+      let message = `*🌟 NEW ORDER: ${customOrderID} 🌟*\n\n`;
       message += `*Customer Details:*\n`;
       message += `👤 Name: ${name}\n`;
       message += `📞 Phone: ${phone}\n`;
@@ -96,7 +90,6 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
           message += `\n_(Note: Online Payment Selected - Send Payment Link)_`;
       }
 
-      // 5. Cart එක හිස් කරලා WhatsApp එකට යවනවා
       clearCart();
       
       const whatsappNumber = '94760829235'; 
