@@ -31,7 +31,7 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
     }
 
     try {
-      // 2. Save to Firebase
+      // 2. Save to Firebase (100% ක් සේව් වෙනකන් ඉන්නවා)
       await addDoc(collection(db, "orders"), {
         customerName: name,
         phone: phone,
@@ -48,7 +48,7 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         subTotal: subTotal,
         deliveryFee: deliveryFee,
         totalAmount: finalTotal,
-        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(), // රිපෝට් එකට වැඩ කරන්න නම වෙනස් කළා
         status: paymentMethod === 'Online' ? "Paid (Pending Gateway)" : "New"
       });
 
@@ -78,13 +78,14 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
           message += `\n_(Note: Online Payment Selected - Send Payment Link)_`;
       }
 
-      // 4. Send to WhatsApp
+      // 4. Cart එක හිස් කරලා WhatsApp එකට යවනවා (ෆෝන් වල හිරවෙන එක නැති කරන්න)
+      clearCart();
+      
       const whatsappNumber = '94760829235'; 
       const encodedMessage = encodeURIComponent(message);
-      window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
-
-      // 5. Clear Cart
-      clearCart();
+      
+      // ෆෝන් එකේ ඇප් එක Suspend වෙන්න කලින් යවන්න _self පාවිච්චි කළා
+      window.location.href = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
     } catch (error) {
       console.error("Error saving order: ", error);
@@ -141,7 +142,6 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
             </div>
           </div>
 
-          {/* අලුතින් එකතු කරපු Payment (Card) කොටස */}
           {paymentMethod === 'Online' && (
             <div className="mt-4 p-4 border-2 border-blue-200 bg-blue-50 rounded-xl space-y-3 animate-slide-in">
               <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -157,7 +157,6 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
           )}
         </form>
 
-        {/* අත්වැරදීමකින් මැකුණු බිල ආයෙත් දැම්මා */}
         <div className="mt-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
           <div className="flex justify-between text-sm text-gray-600 mb-1">
             <span>Subtotal:</span><span>Rs. {subTotal}.00</span>
