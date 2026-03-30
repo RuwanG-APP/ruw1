@@ -42,7 +42,9 @@ export default function DailyReport() {
   let grandTotal = 0;
   const itemSummary: any = {};
 
-  orders.forEach(order => {
+
+    
+orders.forEach(order => {
     // Payment totals
     if (order.paymentMethod === 'COD') {
       totalCOD += order.totalAmount || 0;
@@ -62,7 +64,18 @@ export default function DailyReport() {
         itemSummary[itemName].amount += item.price || 0;
       });
     }
+
+    // අලුතින් එකතු කරපු කෑල්ල: ඩිලිවරි ගාස්තුව වගුවට දැමීම
+    if (order.deliveryFee) {
+      if (!itemSummary['Delivery Charges 🛵']) {
+        itemSummary['Delivery Charges 🛵'] = { qty: 0, amount: 0 };
+      }
+      itemSummary['Delivery Charges 🛵'].qty += 1; // ඕඩර් කීයකට ඩිලිවරි ගියාද කියලා බලාගන්න
+      itemSummary['Delivery Charges 🛵'].amount += order.deliveryFee;
+    }
   });
+
+
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-xl font-bold">Loading Report...</div>;
