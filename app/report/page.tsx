@@ -121,7 +121,7 @@ export default function DailyReport() {
                   <td className="p-2 border-r-2 border-black font-mono text-[10px] font-bold text-center">{order.orderID}</td>
                   <td className="p-2 border-r-2 border-black text-sm uppercase">
                     <div className="font-black text-blue-700 text-xs mb-1">{order.customerName}</div>
-                    {order.items?.map((it:any,) => ... i:number) => <div key={i} className="text-[10px] leading-tight">• {it.name}</div>)}     
+                    {order.items?.map((it:any, i:number) => <div key={i} className="text-[10px] leading-tight">• {it.name}</div>)}
                   </td>
                   <td className="p-2 border-r-2 border-black text-right font-mono text-xs">{Number(order.subTotal).toFixed(2)}</td>
                   <td className="p-2 border-r-2 border-black text-right font-black bg-zinc-50">{Number(order.totalAmount).toFixed(2)}</td>
