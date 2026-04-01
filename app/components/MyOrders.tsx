@@ -27,6 +27,9 @@ export default function MyOrders({ goBack, lang }: any) {
         }
       });
       
+      // අලුත්ම ඕඩර් එක උඩින්ම පෙන්වීමට
+      fetchedOrders.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+
       setOrders(fetchedOrders);
       if (fetchedOrders.length === 0) {
         setMessage(lang === 'en' ? 'No orders found for today.' : 'අද දින සඳහා ඇණවුම් නොමැත.');
@@ -41,7 +44,6 @@ export default function MyOrders({ goBack, lang }: any) {
   const handleCancel = async (order: any) => {
     const currentHour = new Date().getHours();
     
-    // දවල් 2 (14:00) ට පස්සේ කැන්සල් කරන්න දෙන්නේ නෑ
     if (currentHour >= 14) {
       alert(lang === 'en' ? "Cancellations are only allowed before 2:00 PM." : "ඇණවුම් අවලංගු කළ හැක්කේ ප.ව 2:00 ට පෙර පමණි.");
       return;
@@ -53,12 +55,11 @@ export default function MyOrders({ goBack, lang }: any) {
     setLoading(true);
     try {
       const refundAmount = Math.round(order.totalAmount * 0.85); 
-      // කැන්සල් කරපු වෙලාව ලබාගැනීම
       const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Colombo', hour: '2-digit', minute:'2-digit', hour12: true });
       
       await updateDoc(doc(db, "orders", order.id), {
          status: "Cancelled - Refunded to Wallet",
-         cancelledAtTime: currentTime // ඇඩ්මින් රිපෝට් එකට වෙලාව යැවීම
+         cancelledAtTime: currentTime
       });
 
       await setDoc(doc(db, "wallets", phone), {
@@ -98,24 +99,38 @@ export default function MyOrders({ goBack, lang }: any) {
         {message && <p className="text-red-500 font-bold text-center text-sm">{message}</p>}
 
         <div className="space-y-4">
-          {orders.map((o, i) => (
+          {orders.map((o, i) => {
+            // බොත්තම් Disable කිරීම සඳහා Condition එක
+            const isCancelled = o.status.toLowerCase().includes('cancel');
+            const isHandovered = o.status.toLowerCase().includes('handover');
+            const isPast2PM = new Date().getHours() >= 14;
+
+            return (
             <div key={i} className="border-2 border-gray-200 p-4 rounded-xl">
                <div className="flex justify-between items-center mb-2 border-b pb-2">
                  <span className="font-mono text-xs font-bold text-zinc-500">{o.orderID}</span>
-                 <span className={`text-xs font-black px-2 py-1 rounded ${o.status.includes('Cancelled') ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
+                 <span className={`text-xs font-black px-2 py-1 rounded ${isCancelled ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
                </div>
                <div className="text-sm font-bold text-gray-800 mb-3">
                  {lang === 'en' ? 'Total: Rs.' : 'එකතුව: රු.'} {o.totalAmount}.00
                </div>
                
-               {/* Handover කරපු ඒවාට සහ Cancel කරපු ඒවාට බොත්තම පෙන්නන්නේ නෑ */}
-               {!o.status.includes('Cancelled') && !o.status.includes('Handovered') && new Date().getHours() < 14 && (
+               {/* Handover හෝ Cancel කරපු ඒවාට අළු පාට Disabled බොත්තම පෙන්නනවා */}
+               {(isCancelled || isHandovered) ? (
+                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed">
+                   {lang === 'en' ? 'Not Eligible for Cancellation' : 'මෙය අවලංගු කළ නොහැක'}
+                 </button>
+               ) : isPast2PM ? (
+                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed">
+                   {lang === 'en' ? 'Cancellation time (2 PM) has passed' : 'ප.ව 2:00 පසු වී ඇති බැවින් අවලංගු කළ නොහැක'}
+                 </button>
+               ) : (
                  <button onClick={() => handleCancel(o)} className="w-full bg-red-100 text-red-600 border border-red-200 py-2 rounded-lg font-bold text-sm hover:bg-red-600 hover:text-white transition-colors">
                    {lang === 'en' ? 'Cancel Order & Get 85% Refund' : 'ඇණවුම අවලංගු කර 85% ක් ලබාගන්න'}
                  </button>
                )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>
