@@ -1,107 +1,94 @@
-// Ruwan Login Page2
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-export default function VendorLogin() {
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const handleLogin = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const q = query(collection(db, 'vendors'), 
-                where("mobilePhone", "==", phone), 
-                where("password", "==", password));
-  
+import { doc, getDoc } from 'firebase/firestore';
 
-      const querySnapshot = await getDocs(q);
+export default function VendorDashboard() {
+  const [vendor, setVendor] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    // LocalStorage එකෙන් Vendor ID එක ගන්නවා
+    const vId = localStorage.getItem('vendorId');
 
-
-      if (!querySnapshot.empty) {
-
-        const vendorData = querySnapshot.docs[0].data();
-
-        // ලොගින් වුණාම නියෝජිතයාගේ තොරතුරු තාවකාලිකව සේව් කරගන්නවා
-
-        localStorage.setItem('vendorId', querySnapshot.docs[0].id);
-
-        localStorage.setItem('vendorName', vendorData.fullName);
-
-        localStorage.setItem('vendorCity', vendorData.city);
-
-        
-
-        window.location.href = '/vendor-dashboard';
-
-      } else {
-
-        alert("දුරකථන අංකය හෝ මුද්‍රිත පදය (Password) වැරදියි!");
-
-      }
-
-    } catch (error) {
-
-      alert("Error logging in: " + error);
-
+    if (!vId) {
+      // ID එක නැත්නම් විතරක් ලොගින් එකට යවනවා
+      window.location.href = '/vendor-login';
+      return;
     }
 
-    setLoading(false);
+    const fetchVendorData = async () => {
+      try {
+        const docRef = doc(db, 'vendors', vId);
+        const docSnap = await getDoc(docRef);
 
-  };
+        if (docSnap.exists()) {
+          setVendor(docSnap.data());
+        } else {
+          // ඩේටාබේස් එකේ නැත්නම් ලොගවුට් කරනවා
+          localStorage.removeItem('vendorId');
+          window.location.href = '/vendor-login';
+        }
+      } catch (error) {
+        console.error("Error fetching vendor:", error);
+      }
+      setLoading(false);
+    };
 
+    fetchVendorData();
+  }, []);
 
+  // ලෝඩ් වෙනකම් පෙන්වන ස්ක්‍රීන් එක
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center font-black animate-pulse text-orange-600 uppercase tracking-widest">
+          Rasa.lk පුවරුව සූදානම් වෙමින් පවතී...
+        </div>
+      </div>
+    );
+  }
 
   return (
-
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-
-      <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100">
-
-        <div className="text-center mb-8">
-
-          <div className="bg-orange-500 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white text-3xl mb-4 shadow-lg">👨‍🍳</div>
-
-          <h2 className="text-2xl font-black text-gray-900 uppercase italic">Vendor Login</h2>
-
-          <p className="text-gray-500 font-bold text-sm">Rasa.lk නියෝජිත පුවරුවට ඇතුළු වන්න</p>
-
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* Header Section */}
+        <div className="bg-zinc-900 p-8 rounded-[2.5rem] shadow-2xl border-b-8 border-orange-500 text-white">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-orange-400 font-black text-xs uppercase tracking-[0.2em] mb-1">Partner Portal</p>
+              <h1 className="text-3xl font-black italic tracking-tighter uppercase">ආයුබෝවන්, {vendor?.fullName}!</h1>
+            </div>
+            <button onClick={() => { localStorage.clear(); window.location.href = '/vendor-login'; }} className="bg-white/10 hover:bg-red-500 text-white px-5 py-2 rounded-2xl text-xs font-black uppercase transition-all">Logout</button>
+          </div>
         </div>
 
-
-
-        <form onSubmit={handleLogin} className="space-y-6">
-
-          <div>
-
-            <label className="block text-sm font-bold text-gray-700 mb-2">ජංගම දුරකථන අංකය</label>
-
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-4 focus:border-orange-500 focus:outline-none font-bold" placeholder="07XXXXXXXX" required />
-
+        {/* Info Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <p className="text-gray-400 font-bold text-[10px] uppercase mb-2">ඔබේ තත්ත්වය</p>
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-4 bg-green-500 rounded-full animate-ping"></span>
+              <span className="text-xl font-black text-gray-900">සක්‍රීයයි (Active)</span>
+            </div>
           </div>
 
-          <div>
-
-            <label className="block text-sm font-bold text-gray-700 mb-2">මුද්‍රිත පදය (Password)</label>
-
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-4 focus:border-orange-500 focus:outline-none font-bold" placeholder="****" required />
-
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <p className="text-gray-400 font-bold text-[10px] uppercase mb-2">නගරය</p>
+            <p className="text-xl font-black text-gray-900 italic tracking-tight">{vendor?.city} - {vendor?.district}</p>
           </div>
+        </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl hover:bg-orange-600 transition-all uppercase tracking-widest">
-
-            {loading ? 'සම්බන්ධ වෙමින්...' : 'ඇතුළු වන්න'}
-
-          </button>
-
-        </form>
+        {/* Orders Section Placeholder */}
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 text-center space-y-4">
+          <div className="bg-gray-50 w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl">📦</div>
+          <h2 className="text-2xl font-black text-gray-900 italic tracking-tighter uppercase">නව ඇණවුම් නොමැත</h2>
+          <p className="text-gray-400 font-bold text-sm max-w-xs mx-auto">ඔබට ඇණවුමක් ලැබුණු සැනින් මෙතැන පෙන්වනු ඇත. කරුණාකර රැඳී සිටින්න.</p>
+        </div>
 
       </div>
-
     </div>
-
   );
-
 }
