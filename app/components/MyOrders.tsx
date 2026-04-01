@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { db } from '../firebase';
-// අලුතින් getDoc කියන එක Import කරලා තියෙනවා Wallet එක චෙක් කරන්න
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, increment, getDoc } from 'firebase/firestore';
 
 export default function MyOrders({ goBack, lang }: any) {
@@ -8,18 +7,15 @@ export default function MyOrders({ goBack, lang }: any) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  
-  // Wallet Balance එක සේව් කරගන්න අලුත් State එක
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   const fetchOrders = async () => {
     if (!phone) return;
     setLoading(true);
     setMessage('');
-    setWalletBalance(null); // සර්ච් කරද්දි පරණ එක රීසෙට් කරනවා
+    setWalletBalance(null); 
     
     try {
-      // 1. ඉස්සෙල්ලම Wallet එකේ සල්ලි තියෙනවද කියලා බලනවා
       const walletSnap = await getDoc(doc(db, "wallets", phone));
       if (walletSnap.exists()) {
         setWalletBalance(walletSnap.data().balance || 0);
@@ -27,7 +23,6 @@ export default function MyOrders({ goBack, lang }: any) {
         setWalletBalance(0);
       }
 
-      // 2. ඊටපස්සේ ඕඩර්ස් ටික ගන්නවා
       const q = query(collection(db, "orders"), where("phone", "==", phone));
       const querySnapshot = await getDocs(q);
       const fetchedOrders: any[] = [];
@@ -86,8 +81,6 @@ export default function MyOrders({ goBack, lang }: any) {
       }, { merge: true });
 
       alert(lang === 'en' ? `Success! Rs.${totalRefund} added to your wallet.` : `සාර්ථකයි! රු.${totalRefund} ක් ඔබගේ Wallet එකට එකතු විය.`);
-      
-      // කැන්සල් කළාට පස්සේ ඕඩර්ස් සහ අලුත් Wallet Balance එක ආයෙත් ලෝඩ් කරනවා
       fetchOrders(); 
     } catch (error) {
       console.error(error);
@@ -119,7 +112,6 @@ export default function MyOrders({ goBack, lang }: any) {
 
         {message && <p className="text-red-500 font-bold text-center text-sm mb-4">{message}</p>}
 
-        {/* අලුතින් එකතු කළ Wallet Balance එක පෙන්වන කොටස */}
         {walletBalance !== null && walletBalance > 0 && (
           <div className="bg-green-100 border-2 border-green-400 text-green-800 p-4 rounded-xl text-center mb-6 font-black shadow-sm">
              💰 {lang === 'en' ? 'Your Wallet Balance:' : 'ඔබගේ Wallet එකේ ඇති මුදල:'} Rs. {walletBalance}.00
