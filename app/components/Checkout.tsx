@@ -3,7 +3,11 @@ import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp, onSnapshot, doc } from 'firebase/firestore';
 import { getBaseName } from '../lib/pricing';
 
-export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart }: any) {
+export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, lang, clearCart }: any) {
+  // --- Crash වැළැක්වීම: cartItems null වුණොත් [] (empty array) එකක් ගන්න ---
+  const cartItems = rawCartItems || [];
+  // --------------------------------------------------------------------------
+
   const [isCityLimit, setIsCityLimit] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('COD');
   
@@ -197,4 +201,11 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
             <span className="animate-pulse">{lang === 'en' ? 'Processing...' : 'කරුණාකර රැඳී සිටින්න...'}</span>
           ) : (
             paymentMethod === 'Online' 
-              ? (lang ===
+              ? (lang === 'en' ? `Pay Rs. ${finalTotal}.00 Securely` : `රු. ${finalTotal}.00 ක් ගෙවන්න`)
+              : (lang === 'en' ? 'Confirm Order' : 'ඇණවුම තහවුරු කරන්න')
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}

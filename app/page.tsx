@@ -30,7 +30,10 @@ export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
+  // --- Crash වැළැක්වීම: cartItems [] (empty array) එකකට initialize කිරීම ---
   const [cartItems, setCartItems] = useState<any[]>([]);
+  // --------------------------------------------------------------------------
+  
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   
