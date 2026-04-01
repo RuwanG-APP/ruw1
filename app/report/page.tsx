@@ -1,4 +1,3 @@
-// app/report/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, orderBy, updateDoc, doc } from "firebase/firestore"; 
@@ -35,7 +34,8 @@ export default function DailyReport() {
       const baseName = getBaseName(item.name || "");
       const menuKey = Object.keys(menuCosts).find(k => k.toUpperCase().includes(baseName)) || baseName;
       
-      const unitCost = Number(item.costPrice ?? menuCosts[menuKey]?.cost ?? 0);
+      // දැන් අපි කෙලින්ම Settings වල තියෙන අලුත්ම Cost එක ගන්නවා (ඔයා ඉල්ලපු පරණ ලොජික් එක)
+      const unitCost = Number(menuCosts[menuKey]?.cost ?? 0);
       const qty = Number(item.qty || 1);
       const profit = Number(item.price || 0) - (unitCost * qty);
       
@@ -51,68 +51,83 @@ export default function DailyReport() {
   const printSlip = (order: any, type: string) => {
     const win = window.open("", "_blank");
     if (!win) return;
-    const content = `
+
+    const isBill = type === 'BILL';
+
+    let content = `
       <html>
         <head>
           <style>
-            body { font-family: sans-serif; padding: 20px; }
-            .bill { max-width: 350px; margin: auto; border: 1px solid #eee; padding: 15px; }
+            body { font-family: sans-serif; padding: 20px; color: #000; }
+            .bill { max-width: 350px; margin: auto; border: 1px solid #000; padding: 15px; }
             .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
-            .info { font-size: 14px; margin-bottom: 15px; }
-            .info b { display: inline-block; width: 60px; }
+            .info { font-size: 14px; margin-bottom: 15px; line-height: 1.6; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
             th { border-bottom: 1px solid #000; text-align: left; font-size: 13px; padding-bottom: 5px; }
-            td { padding: 8px 0; font-size: 13px; border-bottom: 1px dashed #eee; }
-            .totals { border-top: 2px dashed #000; margin-top: 15px; padding-top: 10px; }
-            .grand { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; color: #000; margin-top: 5px; }
-            .promo { font-weight: bold; color: #ff6600; font-size: 14px; margin: 15px 0 5px 0; text-align: center; }
+            td { padding: 8px 0; font-size: 14px; border-bottom: 1px dashed #eee; font-weight: bold; }
+            .totals { border-top: 2px dashed #000; margin-top: 15px; padding-top: 10px; font-size: 14px; }
+            .grand { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-top: 5px; }
+            .promo { font-weight: bold; font-size: 18px; margin: 20px 0; text-align: center; color: #000;}
           </style>
         </head>
         <body onload="window.print(); window.close();">
           <div class="bill">
             <div class="header">
               <h2 style="margin:0">WEEK OUT</h2>
-              <p style="margin:5px 0; font-weight:bold;">${type === 'KITCHEN' ? 'KITCHEN ORDER' : 'OFFICIAL INVOICE'}</p>
+              <p style="margin:5px 0; font-weight:bold;">${isBill ? 'BILL' : 'CHEF'}</p>
               <small>ID: ${order.orderID} | ${new Date().toLocaleDateString()}</small>
-            </div>
-            ${type === 'CUSTOMER' ? `
-              <div class="info">
-                <div><b>NAME:</b> ${order.customerName || "-"}</div>
-                <div><b>PHONE:</b> ${order.phone || "-"}</div>
-                <div><b>ADDR:</b> ${order.address || "-"}</div>
-              </div>` : ''}
+            </div>`;
+
+    if (isBill) {
+      content += `
+            <div class="info">
+              <div><b>Name:</b> ${order.customerName || "-"}</div>
+              <div><b>Phone:</b> ${order.phone || "-"}</div>
+              <div><b>Address:</b> ${order.address || "-"}</div>
+            </div>`;
+    }
+
+    content += `
             <table>
               <thead>
                 <tr>
                   <th>ITEM</th>
                   <th style="text-align:center">QTY</th>
-                  ${type === 'CUSTOMER' ? '<th style="text-align:right">PRICE</th>' : ''}
+                  ${isBill ? '<th style="text-align:right">PRICE</th>' : ''}
                 </tr>
               </thead>
               <tbody>
                 ${order.items.map((it:any) => {
-                  const cleanName = it.name.replace(/^\\d+\\s*x\\s*/i, '');
+                  const cleanName = it.name.replace(/^\d+\s*x\s*/i, '');
                   return `
                   <tr>
                     <td>${cleanName} <br><small style="color:gray">${it.details || ""}</small></td>
-                    <td style="text-align:center; font-weight:bold;">${it.qty}</td>
-                    ${type === 'CUSTOMER' ? `<td style="text-align:right">${Number(it.price).toFixed(2)}</td>` : ""}
+                    <td style="text-align:center;">${it.qty}</td>
+                    ${isBill ? `<td style="text-align:right">Rs.${Number(it.price).toFixed(2)}</td>` : ""}
                   </tr>`;
                 }).join("")}
               </tbody>
-            </table>
-            ${type === 'CUSTOMER' ? `
-              <div class="totals">
-                <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>Rs. ${Number(order.subTotal).toFixed(2)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>Rs. ${Number(order.deliveryFee).toFixed(2)}</span></div>
-                <div class="grand"><span>NET TOTAL:</span><span>Rs. ${Number(order.totalAmount).toFixed(2)}</span></div>
-              </div>
-              <div class="promo">Thank you! Order Again and get 3-10% Discount!!</div>
-              <div style="text-align:center; font-size:12px; font-weight:bold;">ORDER VIA APP OR HOTLINE<br>📞 0760829235</div>
-            ` : ''}
+            </table>`;
+
+    if (isBill) {
+      content += `
+            <div class="totals">
+              <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>Rs. ${Number(order.subTotal).toFixed(2)}</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>Rs. ${Number(order.deliveryFee).toFixed(2)}</span></div>
+              <div class="grand"><span>TOTAL:</span><span>Rs. ${Number(order.totalAmount).toFixed(2)}</span></div>
+            </div>
+            <div class="promo">
+               3-10% Discount<br/>
+               Please Come again
+            </div>
+            <div style="text-align:center; font-size:12px; font-weight:bold;">ORDER VIA APP OR HOTLINE<br>📞 0760829235</div>`;
+    }
+
+    content += `
           </div>
         </body>
       </html>`;
+      
     win.document.write(content); win.document.close();
   };
 
@@ -158,7 +173,7 @@ export default function DailyReport() {
                   <td className="p-3 text-center">
                     <div className="flex gap-1 justify-center">
                         <button onClick={()=>printSlip(o, 'CHEF')} className="bg-zinc-800 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Chef</button>
-                        <button onClick={()=>printSlip(o, 'CUSTOMER')} className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Bill</button>
+                        <button onClick={()=>printSlip(o, 'BILL')} className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Bill</button>
                         {o.status !== 'Handovered' && <button onClick={()=>updateDoc(doc(db,"orders",o.id), {status:"Handovered"})} className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Done</button>}
                     </div>
                   </td>
@@ -170,7 +185,7 @@ export default function DailyReport() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="border-4 border-black p-6 bg-zinc-50 relative shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <h3 className="absolute -top-5 left-6 bg-yellow-400 px-4 py-1 font-black text-xs border-4 border-black uppercase italic">Itemized Profit (Locked)</h3>
+            <h3 className="absolute -top-5 left-6 bg-yellow-400 px-4 py-1 font-black text-xs border-4 border-black uppercase italic">Itemized Profit</h3>
             <div className="space-y-3 mt-4">
                 {Object.entries(breakdown.itemProfits).map(([name, profit]: any) => (
                 <div key={name} className="flex justify-between border-b-2 border-dashed border-zinc-200 pb-1 font-black uppercase text-xs">

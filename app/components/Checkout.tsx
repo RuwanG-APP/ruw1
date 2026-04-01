@@ -1,32 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, onSnapshot, doc } from 'firebase/firestore';
-import { getBaseName } from '../lib/pricing';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, lang, clearCart }: any) {
-  // --- Crash වැළැක්වීම: cartItems null වුණොත් [] (empty array) එකක් ගන්න ---
   const cartItems = rawCartItems || [];
-  // --------------------------------------------------------------------------
 
   const [isCityLimit, setIsCityLimit] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState('COD');
+  const [paymentMethod, setPaymentMethod] = useState('Online'); 
   
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [menuCosts, setMenuCosts] = useState<any>({});
 
   const deliveryFee = isCityLimit ? 150 : 250;
   const finalTotal = subTotal + deliveryFee;
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'menu'), (snap) => {
-      if (snap.exists()) setMenuCosts(snap.data());
-    });
-    return () => unsub();
-  }, []);
 
   const handleConfirmOrder = async () => {
     if (!name || !phone || !address) {
@@ -58,20 +47,14 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
         address: address,
         area: isCityLimit ? 'City Limit' : 'Out of City',
         paymentMethod: paymentMethod,
-        items: cartItems.map((item: any) => {
-          const baseName = getBaseName(item.name.en).toLowerCase();
-          const menuKey = Object.keys(menuCosts).find(k => k.toLowerCase().includes(baseName)) || baseName;
-          
-          return {
+        items: cartItems.map((item: any) => ({
             name: item.name.en,
             qty: item.qty || 1,
             price: item.price,
-            costPrice: Number(menuCosts[menuKey]?.cost || 0),
             details: item.type === 'paratha' 
               ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` 
-              : `${item.portion} ${item.type !== 'biryani' && item.meat !== 'Vegi' ? \`- \${item.meat}\` : ''}`
-          }
-        }),
+              : `${item.portion} - ${item.meat}`
+        })),
         subTotal: subTotal,
         deliveryFee: deliveryFee,
         totalAmount: finalTotal,
@@ -79,19 +62,20 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
         status: paymentMethod === 'Online' ? "Paid (Pending Gateway)" : "New"
       });
 
-      let message = `*🌟 NEW ORDER: ${customOrderID} 🌟*\n\n`;
+      // --- පරණ ලස්සන WhatsApp මැසේජ් එක ---
+      let message = `❖ *NEW ORDER: ${customOrderID}* ❖\n\n`;
       message += `*Customer Details:*\n`;
-      message += `👤 Name: ${name}\n`;
-      message += `📞 Phone: ${phone}\n`;
-      message += `📍 Address: ${address}\n`;
-      message += `🛵 Area: ${isCityLimit ? 'City Limit' : 'Out of City'}\n`;
-      message += `💳 Payment: ${paymentMethod}\n\n`;
+      message += `❖ Name: ${name}\n`;
+      message += `❖ Phone: ${phone}\n`;
+      message += `❖ Address: ${address}\n`;
+      message += `❖ Area: ${isCityLimit ? 'City Limit' : 'Out of City'}\n`;
+      message += `❖ Payment: ${paymentMethod}\n\n`;
       
       message += `*Order Details:*\n`;
       cartItems.forEach((item: any, index: number) => {
         let itemDetails = item.type === 'paratha' 
           ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` 
-          : `${item.portion} ${item.type !== 'biryani' && item.meat !== 'Vegi' ? \`- \${item.meat}\` : ''}`;
+          : `${item.portion} - ${item.meat}`;
         message += `${index + 1}. ${item.name.en} (${itemDetails}) - Rs.${item.price}\n`;
       });
 
@@ -123,70 +107,45 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-lg border animate-fade-in relative max-h-[90vh] overflow-y-auto">
         <button onClick={goBack} disabled={isProcessing} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 font-bold text-xl disabled:opacity-50">✕</button>
         
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {lang === 'en' ? 'Complete Your Order' : 'ඔබගේ ඇණවුම සම්පූර්ණ කරන්න'}
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 uppercase italic tracking-tight">
+          CHECKOUT
         </h2>
         
         <form className="space-y-4 mt-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">{lang === 'en' ? 'Name' : 'නම'}</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-200 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" placeholder="Saman Kumara" />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-600 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" placeholder="Name" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">{lang === 'en' ? 'Contact No' : 'දුරකථන අංකය'}</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-200 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" placeholder="07X XXX XXXX" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-600 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" placeholder="Phone" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">{lang === 'en' ? 'Delivery Address' : 'ලිපිනය'}</label>
-            <textarea value={address} onChange={(e) => setAddress(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-200 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" rows={2} placeholder="No 123, Main Street..."></textarea>
+            <textarea value={address} onChange={(e) => setAddress(e.target.value)} disabled={isProcessing} className="w-full border-2 border-gray-600 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none disabled:bg-gray-100" rows={2} placeholder="Address"></textarea>
           </div>
 
           <div className="pt-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">{lang === 'en' ? 'Delivery Area' : 'බෙදාහරින ප්‍රදේශය'}</label>
             <div className="flex gap-3">
-              <button type="button" disabled={isProcessing} onClick={() => setIsCityLimit(true)} className={`flex-1 py-2 px-2 rounded-xl border-2 font-medium text-sm transition-all disabled:opacity-50 ${isCityLimit ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
-                City Limit (+Rs.150)
+              <button type="button" disabled={isProcessing} onClick={() => setIsCityLimit(true)} className={`flex-1 py-2 px-2 rounded-xl border-2 font-bold text-sm transition-all disabled:opacity-50 ${isCityLimit ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
+                City
               </button>
-              <button type="button" disabled={isProcessing} onClick={() => setIsCityLimit(false)} className={`flex-1 py-2 px-2 rounded-xl border-2 font-medium text-sm transition-all disabled:opacity-50 ${!isCityLimit ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
-                Out of City (+Rs.250)
+              <button type="button" disabled={isProcessing} onClick={() => setIsCityLimit(false)} className={`flex-1 py-2 px-2 rounded-xl border-2 font-bold text-sm transition-all disabled:opacity-50 ${!isCityLimit ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
+                Out
               </button>
             </div>
           </div>
 
           <div className="pt-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">{lang === 'en' ? 'Payment Method' : 'ගෙවීම් ක්‍රමය'}</label>
             <div className="flex gap-3">
-              <button type="button" disabled={isProcessing} onClick={() => setPaymentMethod('COD')} className={`flex-1 py-2 rounded-xl border-2 font-medium transition-all disabled:opacity-50 ${paymentMethod === 'COD' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
+              <button type="button" disabled={isProcessing} onClick={() => setPaymentMethod('COD')} className={`flex-1 py-2 rounded-xl border-2 font-bold text-sm transition-all disabled:opacity-50 ${paymentMethod === 'COD' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
                 Cash on Delivery
               </button>
-              <button type="button" disabled={isProcessing} onClick={() => setPaymentMethod('Online')} className={`flex-1 py-2 rounded-xl border-2 font-medium transition-all disabled:opacity-50 ${paymentMethod === 'Online' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
-                Online (Card)
+              <button type="button" disabled={isProcessing} onClick={() => setPaymentMethod('Online')} className={`flex-1 py-2 rounded-xl border-2 font-bold text-sm transition-all disabled:opacity-50 ${paymentMethod === 'Online' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>
+                Bank Transfer
               </button>
             </div>
           </div>
-
-          {paymentMethod === 'Online' && (
-            <div className="mt-4 p-4 border-2 border-blue-200 bg-blue-50 rounded-xl space-y-3 animate-slide-in">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                <span className="text-blue-600 mr-2">💳</span>
-                {lang === 'en' ? 'Card Details' : 'කාඩ්පත් විස්තර'}
-              </label>
-              <input type="text" disabled={isProcessing} placeholder="Card Number (0000 0000 0000 0000)" className="w-full border-2 border-gray-200 rounded-xl p-2.5 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 text-sm" />
-              <div className="flex gap-3">
-                 <input type="text" disabled={isProcessing} placeholder="MM/YY" className="w-1/2 border-2 border-gray-200 rounded-xl p-2.5 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 text-sm" />
-                 <input type="text" disabled={isProcessing} placeholder="CVC" className="w-1/2 border-2 border-gray-200 rounded-xl p-2.5 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 text-sm" />
-              </div>
-            </div>
-          )}
         </form>
 
         <div className="mt-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-          <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>Subtotal:</span><span>Rs. {subTotal}.00</span>
-          </div>
-          <div className="flex justify-between text-sm text-gray-600 mb-3 border-b pb-3">
-            <span>Delivery Fee:</span><span>Rs. {deliveryFee}.00</span>
-          </div>
           <div className="flex justify-between text-xl font-black text-gray-900">
             <span>Total:</span><span>Rs. {finalTotal}.00</span>
           </div>
@@ -195,16 +154,13 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
         <button 
           onClick={handleConfirmOrder} 
           disabled={isProcessing}
-          className={`w-full mt-6 text-white font-bold py-4 px-4 rounded-xl transition shadow-lg flex justify-center items-center gap-2 ${paymentMethod === 'Online' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'} disabled:opacity-70 disabled:cursor-not-allowed`}
+          className="w-full mt-6 text-white font-black py-4 px-4 rounded-xl transition shadow-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-70 uppercase"
         >
-          {isProcessing ? (
-            <span className="animate-pulse">{lang === 'en' ? 'Processing...' : 'කරුණාකර රැඳී සිටින්න...'}</span>
-          ) : (
-            paymentMethod === 'Online' 
-              ? (lang === 'en' ? `Pay Rs. ${finalTotal}.00 Securely` : `රු. ${finalTotal}.00 ක් ගෙවන්න`)
-              : (lang === 'en' ? 'Confirm Order' : 'ඇණවුම තහවුරු කරන්න')
-          )}
+          {isProcessing ? 'Processing...' : 'CONFIRM ORDER'}
         </button>
+        <div className="text-center mt-3">
+            <button onClick={goBack} className="text-gray-400 font-bold text-sm hover:text-gray-700">Cancel</button>
+        </div>
       </div>
     </div>
   );
