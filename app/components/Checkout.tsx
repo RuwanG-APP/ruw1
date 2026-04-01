@@ -62,7 +62,6 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
         status: paymentMethod === 'Online' ? "Paid (Pending Gateway)" : "New"
       });
 
-      // --- පරණ ලස්සන WhatsApp මැසේජ් එක ---
       let message = `❖ *NEW ORDER: ${customOrderID}* ❖\n\n`;
       message += `*Customer Details:*\n`;
       message += `❖ Name: ${name}\n`;
@@ -146,6 +145,12 @@ export default function Checkout({ cartItems: rawCartItems, subTotal, goBack, la
         </form>
 
         <div className="mt-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+          <div className="flex justify-between text-sm text-gray-600 mb-1 font-bold">
+            <span>Subtotal:</span><span>Rs. {subTotal}.00</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600 mb-3 border-b border-gray-200 pb-3 font-bold">
+            <span>Delivery:</span><span>Rs. {deliveryFee}.00</span>
+          </div>
           <div className="flex justify-between text-xl font-black text-gray-900">
             <span>Total:</span><span>Rs. {finalTotal}.00</span>
           </div>
