@@ -10,7 +10,6 @@ export default function DailyReport() {
   const [pass, setPass] = useState("");
   const [isAuth, setIsAuth] = useState(false);
 
-  // --- අලුතින් එක් කළ දිනය තේරීමේ State එක ---
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -27,12 +26,10 @@ export default function DailyReport() {
       snapshot.forEach((orderDoc) => {
         const data = orderDoc.data();
         if (data.createdAt) {
-          // Firebase වෙලාව අපේ ලංකාවේ වෙලාවට හදලා YYYY-MM-DD විදිහට ගැනීම
           const orderDateObj = data.createdAt.toDate();
           orderDateObj.setMinutes(orderDateObj.getMinutes() - orderDateObj.getTimezoneOffset());
           const orderDateStr = orderDateObj.toISOString().split('T')[0];
 
-          // තෝරපු දිනයට අදාළ ඕඩර්ස් විතරක් වෙන් කිරීම
           if (orderDateStr === selectedDate) {
             filteredOrders.push({ id: orderDoc.id, ...data });
           }
@@ -41,9 +38,15 @@ export default function DailyReport() {
       setOrders(filteredOrders);
     });
     return () => { unsubSettings(); unsubOrders(); };
-  }, [selectedDate]); // දිනය වෙනස් වෙද්දී අලුත් දත්ත ගෙන්වා ගැනීම
+  }, [selectedDate]);
 
   const breakdown = orders.reduce((acc, order) => {
+    // ඕඩරය කැන්සල් කරලා නම්, 15% ක ලාභය විතරක් එකතු කරනවා
+    if (order.status.includes('Cancelled')) {
+       acc.cancellationFees += (Number(order.totalAmount) * 0.15);
+       return acc;
+    }
+
     acc.totalDelivery += Number(order.deliveryFee ?? 0);
     order.items?.forEach((item: any) => {
       const baseName = getBaseName(item.name || "");
@@ -56,11 +59,19 @@ export default function DailyReport() {
       acc.itemProfits[baseName] = (acc.itemProfits[baseName] || 0) + profit;
     });
     return acc;
-  }, { totalDelivery: 0, itemProfits: {} as Record<string, number> });
+  }, { totalDelivery: 0, itemProfits: {} as Record<string, number>, cancellationFees: 0 });
 
   const profitValues = Object.values(breakdown.itemProfits) as number[];
-  const totalNetProfit = profitValues.reduce((a, b) => a + b, 0);
-  const grandTotalAll = orders.reduce((sum, o) => sum + Number(o.totalAmount ?? 0), 0);
+  const baseProfit = profitValues.reduce((a, b) => a + b, 0);
+  const totalNetProfit = baseProfit + breakdown.cancellationFees;
+
+  const grandTotalAll = orders.reduce((sum, o) => {
+    // කැන්සල් කරපු ඕඩර් වලින් 15% ක් විතරයි Grand Total එකට එකතු වෙන්නේ (Cash in hand)
+    if (o.status.includes('Cancelled')) {
+      return sum + (Number(o.totalAmount) * 0.15);
+    }
+    return sum + Number(o.totalAmount ?? 0);
+  }, 0);
 
   const printSlip = (order: any, type: string) => {
     const win = window.open("", "_blank");
@@ -128,6 +139,7 @@ export default function DailyReport() {
             <div class="totals">
               <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>Rs. ${Number(order.subTotal).toFixed(2)}</span></div>
               <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>Rs. ${Number(order.deliveryFee).toFixed(2)}</span></div>
+              ${order.walletUsed ? `<div style="display:flex;justify-content:space-between"><span>Wallet:</span><span>-Rs. ${order.walletUsed}.00</span></div>` : ''}
               <div class="grand"><span>TOTAL:</span><span>Rs. ${Number(order.totalAmount).toFixed(2)}</span></div>
             </div>
             <div class="promo">
@@ -164,7 +176,6 @@ export default function DailyReport() {
         <div className="text-center border-b-4 border-black pb-4 mb-8">
             <h1 className="text-5xl font-black uppercase tracking-tighter italic">Week Out - Dashboard</h1>
             
-            {/* දිනය තේරීමේ කැලැන්ඩරය (මෙය ප්‍රින්ට් කිරීමේදී නොපෙනේ) */}
             <div className="mt-4 no-print flex justify-center">
                 <input 
                   type="date" 
@@ -182,7 +193,7 @@ export default function DailyReport() {
                 <th className="p-4 border-r border-white/20">ID</th>
                 <th className="p-4 text-left border-r border-white/20">Customer & Items</th>
                 <th className="p-4 text-right border-r border-white/20">Grand Total</th>
-                <th className="p-4">Action</th>
+                <th className="p-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -195,11 +206,18 @@ export default function DailyReport() {
                   </td>
                   <td className="p-3 text-right font-black bg-zinc-50 border-r-2 border-black text-lg">Rs. {o.totalAmount}.00</td>
                   <td className="p-3 text-center">
-                    <div className="flex gap-1 justify-center">
-                        <button onClick={()=>printSlip(o, 'CHEF')} className="bg-zinc-800 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Chef</button>
-                        <button onClick={()=>printSlip(o, 'BILL')} className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Bill</button>
-                        {o.status !== 'Handovered' && <button onClick={()=>updateDoc(doc(db,"orders",o.id), {status:"Handovered"})} className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase">Done</button>}
-                    </div>
+                    {/* කැන්සල් කරපු ඕඩර් වලට රතු පාටින් පණිවිඩය පෙන්නනවා, බොත්තම් හැංගෙනවා */}
+                    {o.status.includes('Cancelled') ? (
+                      <div className="text-red-600 font-bold text-xs uppercase animate-pulse">
+                        Cancelled by Customer at {o.cancelledAtTime || 'Before 2 PM'}
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 justify-center">
+                          <button onClick={()=>printSlip(o, 'CHEF')} className="bg-zinc-800 text-white px-2 py-1 rounded text-[10px] font-black uppercase hover:bg-zinc-700">Chef</button>
+                          <button onClick={()=>printSlip(o, 'BILL')} className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase hover:bg-blue-500">Bill</button>
+                          {o.status !== 'Handovered' && <button onClick={()=>updateDoc(doc(db,"orders",o.id), {status:"Handovered"})} className="bg-orange-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase hover:bg-orange-500">Done</button>}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -217,6 +235,14 @@ export default function DailyReport() {
                     <span className="text-green-700">Rs. {Number(profit).toFixed(2)}</span>
                 </div>
                 ))}
+                
+                {/* අලුතින් ලැබෙන 15% ලාභය වෙනම පෙන්නනවා */}
+                {breakdown.cancellationFees > 0 && (
+                  <div className="flex justify-between border-b-2 border-dashed border-red-200 pb-1 font-black uppercase text-xs mt-4 pt-2">
+                      <span className="text-red-600">Cancellation Fees (15%)</span>
+                      <span className="text-green-700">Rs. {breakdown.cancellationFees.toFixed(2)}</span>
+                  </div>
+                )}
             </div>
           </div>
 

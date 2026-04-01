@@ -22,7 +22,6 @@ export default function MyOrders({ goBack, lang }: any) {
 
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        // පෙන්නන්නේ අද දවසේ දාපු ඕඩර්ස් විතරයි
         if (data.orderDateOnly === datePart) {
            fetchedOrders.push({ id: docSnap.id, ...data });
         }
@@ -34,7 +33,7 @@ export default function MyOrders({ goBack, lang }: any) {
       }
     } catch (error) {
       console.error(error);
-      setMessage("Error fetching orders.");
+      setMessage(lang === 'en' ? "Error fetching orders." : "ඇණවුම් ලබාගැනීමේ දෝෂයක්.");
     }
     setLoading(false);
   };
@@ -53,23 +52,24 @@ export default function MyOrders({ goBack, lang }: any) {
 
     setLoading(true);
     try {
-      const refundAmount = Math.round(order.totalAmount * 0.85); // 85% ලොජික් එක
+      const refundAmount = Math.round(order.totalAmount * 0.85); 
+      // කැන්සල් කරපු වෙලාව ලබාගැනීම
+      const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Colombo', hour: '2-digit', minute:'2-digit', hour12: true });
       
-      // ඕඩරය Cancelled කියලා අප්ඩේට් කිරීම
       await updateDoc(doc(db, "orders", order.id), {
-         status: "Cancelled - Refunded to Wallet"
+         status: "Cancelled - Refunded to Wallet",
+         cancelledAtTime: currentTime // ඇඩ්මින් රිපෝට් එකට වෙලාව යැවීම
       });
 
-      // Wallet එකට සල්ලි දැමීම (Phone නම්බර් එක තමයි ID එක)
       await setDoc(doc(db, "wallets", phone), {
          balance: increment(refundAmount)
       }, { merge: true });
 
       alert(lang === 'en' ? `Success! Rs.${refundAmount} added to your wallet.` : `සාර්ථකයි! රු.${refundAmount} ක් ඔබගේ Wallet එකට එකතු විය.`);
-      fetchOrders(); // ආයෙත් ඕඩර්ස් ටික ලෝඩ් කිරීම
+      fetchOrders(); 
     } catch (error) {
       console.error(error);
-      alert("Error cancelling order.");
+      alert(lang === 'en' ? "Error cancelling order." : "අවලංගු කිරීමේ දෝෂයක්.");
     }
     setLoading(false);
   };
@@ -91,7 +91,7 @@ export default function MyOrders({ goBack, lang }: any) {
              className="flex-1 border-2 border-gray-600 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none" 
            />
            <button onClick={fetchOrders} className="bg-zinc-900 text-white px-4 rounded-xl font-bold hover:bg-orange-600 transition-colors">
-             {loading ? '...' : 'Search'}
+             {loading ? '...' : (lang === 'en' ? 'Search' : 'සොයන්න')}
            </button>
         </div>
 
@@ -104,10 +104,12 @@ export default function MyOrders({ goBack, lang }: any) {
                  <span className="font-mono text-xs font-bold text-zinc-500">{o.orderID}</span>
                  <span className={`text-xs font-black px-2 py-1 rounded ${o.status.includes('Cancelled') ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
                </div>
-               <div className="text-sm font-bold text-gray-800 mb-3">Total: Rs. {o.totalAmount}.00</div>
+               <div className="text-sm font-bold text-gray-800 mb-3">
+                 {lang === 'en' ? 'Total: Rs.' : 'එකතුව: රු.'} {o.totalAmount}.00
+               </div>
                
-               {/* ප.ව 2 ට කලින් නම් සහ කැන්සල් කරලා නැත්නම් විතරක් බොත්තම පෙන්නනවා */}
-               {!o.status.includes('Cancelled') && new Date().getHours() < 14 && (
+               {/* Handover කරපු ඒවාට සහ Cancel කරපු ඒවාට බොත්තම පෙන්නන්නේ නෑ */}
+               {!o.status.includes('Cancelled') && !o.status.includes('Handovered') && new Date().getHours() < 14 && (
                  <button onClick={() => handleCancel(o)} className="w-full bg-red-100 text-red-600 border border-red-200 py-2 rounded-lg font-bold text-sm hover:bg-red-600 hover:text-white transition-colors">
                    {lang === 'en' ? 'Cancel Order & Get 85% Refund' : 'ඇණවුම අවලංගු කර 85% ක් ලබාගන්න'}
                  </button>
