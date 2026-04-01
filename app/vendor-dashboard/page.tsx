@@ -1,42 +1,20 @@
+// Ruwan Login Page2
 'use client';
-
-
-
 import { useState } from 'react';
-
 import { db } from '../firebase';
-
 import { collection, query, where, getDocs } from 'firebase/firestore';
-
-
-
 export default function VendorLogin() {
-
   const [phone, setPhone] = useState('');
-
   const [password, setPassword] = useState('');
-
   const [loading, setLoading] = useState(false);
-
-
-
   const handleLogin = async (e: any) => {
-
     e.preventDefault();
-
     setLoading(true);
-
-
-
     try {
-
       const q = query(collection(db, 'vendors'), 
-
                 where("mobilePhone", "==", phone), 
-
                 where("password", "==", password));
-
-      
+  
 
       const querySnapshot = await getDocs(q);
 
