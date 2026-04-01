@@ -10,23 +10,38 @@ export default function DailyReport() {
   const [pass, setPass] = useState("");
   const [isAuth, setIsAuth] = useState(false);
 
+  // --- අලුතින් එක් කළ දිනය තේරීමේ State එක ---
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  });
+
   useEffect(() => {
     const unsubSettings = onSnapshot(doc(db, "settings", "menu"), (snap) => {
       if (snap.exists()) setMenuCosts(snap.data());
     });
     const q = query(collection(db, "orders"), orderBy("createdAt", "asc"));
     const unsubOrders = onSnapshot(q, (snapshot) => {
-      const today = new Date().toLocaleDateString();
-      const todayOrders: any[] = [];
+      const filteredOrders: any[] = [];
       snapshot.forEach((orderDoc) => {
         const data = orderDoc.data();
-        const orderDate = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "";
-        if (orderDate === today) todayOrders.push({ id: orderDoc.id, ...data });
+        if (data.createdAt) {
+          // Firebase වෙලාව අපේ ලංකාවේ වෙලාවට හදලා YYYY-MM-DD විදිහට ගැනීම
+          const orderDateObj = data.createdAt.toDate();
+          orderDateObj.setMinutes(orderDateObj.getMinutes() - orderDateObj.getTimezoneOffset());
+          const orderDateStr = orderDateObj.toISOString().split('T')[0];
+
+          // තෝරපු දිනයට අදාළ ඕඩර්ස් විතරක් වෙන් කිරීම
+          if (orderDateStr === selectedDate) {
+            filteredOrders.push({ id: orderDoc.id, ...data });
+          }
+        }
       });
-      setOrders(todayOrders);
+      setOrders(filteredOrders);
     });
     return () => { unsubSettings(); unsubOrders(); };
-  }, []);
+  }, [selectedDate]); // දිනය වෙනස් වෙද්දී අලුත් දත්ත ගෙන්වා ගැනීම
 
   const breakdown = orders.reduce((acc, order) => {
     acc.totalDelivery += Number(order.deliveryFee ?? 0);
@@ -34,7 +49,6 @@ export default function DailyReport() {
       const baseName = getBaseName(item.name || "");
       const menuKey = Object.keys(menuCosts).find(k => k.toUpperCase().includes(baseName)) || baseName;
       
-      // දැන් අපි කෙලින්ම Settings වල තියෙන අලුත්ම Cost එක ගන්නවා (ඔයා ඉල්ලපු පරණ ලොජික් එක)
       const unitCost = Number(menuCosts[menuKey]?.cost ?? 0);
       const qty = Number(item.qty || 1);
       const profit = Number(item.price || 0) - (unitCost * qty);
@@ -149,6 +163,16 @@ export default function DailyReport() {
         
         <div className="text-center border-b-4 border-black pb-4 mb-8">
             <h1 className="text-5xl font-black uppercase tracking-tighter italic">Week Out - Dashboard</h1>
+            
+            {/* දිනය තේරීමේ කැලැන්ඩරය (මෙය ප්‍රින්ට් කිරීමේදී නොපෙනේ) */}
+            <div className="mt-4 no-print flex justify-center">
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)} 
+                  className="border-4 border-black p-2 font-bold text-lg outline-none cursor-pointer bg-zinc-50 hover:bg-zinc-100 transition-colors"
+                />
+            </div>
         </div>
 
         <div className="overflow-x-auto mb-10 border-4 border-black">
