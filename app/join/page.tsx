@@ -67,7 +67,8 @@ export default function JoinNetwork() {
     submitBtn: lang === 'en' ? 'SEND APPLICATION' : 'අයදුම්පත යවන්න',
     sending: lang === 'en' ? 'Checking Security...' : 'පරීක්ෂා කරමින් පවතී...',
     successTitle: lang === 'en' ? 'Congratulations!' : 'සුබ පැතුම්!',
-    successMsg: lang === 'en' ? 'Your application has been successfully submitted.' : 'ඔබගේ අයදුම්පත සාර්ථකව අප වෙත ලැබුණි.',
+successMsg: lang === 'en' ? 'Your application has been successfully submitted. Our team will review your details and contact you soon.' : 'ඔබගේ අයදුම්පත සාර්ථකව අප වෙත ලැබුණි. අපගේ කණ්ඩායම විසින් ඔබගේ තොරතුරු පරීක්ෂා කර ඉතා ඉක්මනින් ඔබව සම්බන්ධ කරගනු ඇත.',    
+
     duplicatePhone: lang === 'en' ? 'This Mobile Number is already registered!' : 'මෙම දුරකථන අංකය දැනටමත් ලියාපදිංචි කර ඇත!',
     duplicateNic: lang === 'en' ? 'This NIC Number is already registered!' : 'මෙම හැඳුනුම්පත් අංකය දැනටමත් ලියාපදිංචි කර ඇත!',
     backBtn: lang === 'en' ? 'Back to Home' : 'ආපසු මුල් පිටුවට',
