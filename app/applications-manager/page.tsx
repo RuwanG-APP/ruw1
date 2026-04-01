@@ -7,50 +7,59 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverT
 export default function ApplicationsManager() {
   const [apps, setApps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const lang = 'si'; // උඩින්ම දාමු එතකොට ප්‍රශ්න නෑ
 
   useEffect(() => {
-    const q = query(collection(db, 'vendor_applications'), orderBy('appliedAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setApps(list);
+    try {
+      const q = query(collection(db, 'vendor_applications'), orderBy('appliedAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setApps(list);
+        setLoading(false);
+      }, (error) => {
+        console.error("Firestore Error:", error);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Setup Error:", err);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    }
   }, []);
 
   const updateStatus = async (app: any, newStatus: string) => {
-    const msg = lang === 'en' ? `Do you want to ${newStatus} this application?` : `මෙම අයදුම්පත ${newStatus} කිරීමට ඔබට අවශ්‍යද?`;
+    const msg = `මෙම අයදුම්පත ${newStatus} කිරීමට ඔබට අවශ්‍යද?`;
     if (window.confirm(msg)) {
       try {
-        // 1. ඇප්ලිකේෂන් ස්ටේටස් එක වෙනස් කිරීම
         await updateDoc(doc(db, 'vendor_applications', app.id), { status: newStatus });
 
-        // 2. Approve වුණොත් නියෝජිත ලිස්ට් එකට එකතු කිරීම
         if (newStatus === 'Approved') {
-          const password = app.nic.slice(-4); // NIC අන්තිම 4 තමයි පාස්වර්ඩ් එක
+          const password = app.nic ? app.nic.slice(-4) : "1234"; 
           await addDoc(collection(db, 'vendors'), {
-            fullName: app.fullName,
-            mobilePhone: app.mobilePhone,
-            nic: app.nic,
-            district: app.district,
-            city: app.city,
-            bestFoods: app.bestFoods,
+            fullName: app.fullName || "No Name",
+            mobilePhone: app.mobilePhone || "0000000000",
+            nic: app.nic || "N/A",
+            district: app.district || "N/A",
+            city: app.city || "N/A",
+            bestFoods: app.bestFoods || [],
             password: password,
             isPaid: false,
             approvedAt: serverTimestamp(),
-            trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // දවස් 14ක් ට්‍රයල්
+            trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
           });
           alert(`සාර්ථකයි! නියෝජිතයා ඇතුළත් කරන ලදී. මුද්‍රිත පදය (Password): ${password}`);
         }
       } catch (error) {
-        alert("Error: " + error);
+        alert("Error updating status: " + error);
       }
     }
   };
 
-  const lang = 'si'; // Default Sinhala for manager
-
-  if (loading) return <div className="p-10 text-center font-bold">ඩේටා ලෝඩ් වෙමින් පවතී...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="text-center font-black animate-bounce text-orange-600">ඩේටා ලෝඩ් වෙමින් පවතී...</div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans">
@@ -65,7 +74,7 @@ export default function ApplicationsManager() {
             <div key={app.id} className={`bg-white p-6 rounded-3xl shadow-sm border-l-8 transition-all ${app.status === 'Approved' ? 'border-green-500' : app.status === 'Rejected' ? 'border-red-500' : 'border-blue-500'}`}>
               <div className="flex flex-wrap justify-between items-start gap-4">
                 <div className="space-y-1">
-                  <h3 className="text-xl font-black text-gray-900">{app.fullName}</h3>
+                  <h3 className="text-xl font-black text-gray-900">{app.fullName || 'Unknown'}</h3>
                   <div className="flex flex-wrap gap-3 text-xs font-bold text-gray-500">
                     <span className="bg-gray-100 px-3 py-1 rounded-lg">📞 {app.mobilePhone}</span>
                     <span className="bg-gray-100 px-3 py-1 rounded-lg">🆔 {app.nic}</span>
@@ -89,18 +98,24 @@ export default function ApplicationsManager() {
 
               <div className="mt-5 pt-4 border-t border-gray-50">
                 <div className="flex flex-wrap gap-2">
-                  {app.bestFoods?.map((f: string) => (
+                  {Array.isArray(app.bestFoods) ? app.bestFoods.map((f: string) => (
                     <span key={f} className="bg-orange-50 text-orange-700 border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase">{f}</span>
-                  ))}
+                  )) : <span className="text-gray-300 text-[10px] italic">No Foods Listed</span>}
                 </div>
               </div>
               
               <div className="mt-4 flex justify-between items-center text-[9px] text-gray-300 font-black uppercase tracking-widest">
                 <span>🚚 {app.deliveryMethod}</span>
-                <span>📅 Applied: {app.appliedAt?.toDate().toLocaleString()}</span>
+                <span>📅 Applied: {app.appliedAt ? (app.appliedAt.toDate ? app.appliedAt.toDate().toLocaleString() : 'Date Error') : 'No Date'}</span>
               </div>
             </div>
           ))}
+
+          {apps.length === 0 && (
+            <div className="bg-white p-20 rounded-3xl text-center font-bold text-gray-400 italic border-2 border-dashed border-gray-200">
+               තවමත් කිසිදු අයදුම්පතක් ලැබී නොමැත.
+            </div>
+          )}
         </div>
       </div>
     </div>
