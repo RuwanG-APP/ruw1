@@ -1,10 +1,10 @@
-// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
+import MyOrders from './components/MyOrders'; // අලුත් component එක ගෙනාවා
 
 export const menuItems = [
   { id: 'kottu', name: { en: 'Kottu', si: 'කොත්තු' }, image: '/image_0.png', type: 'standard' },
@@ -30,18 +30,15 @@ export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
-  // --- Crash වැළැක්වීම: cartItems [] (empty array) එකකට initialize කිරීම ---
   const [cartItems, setCartItems] = useState<any[]>([]);
-  // --------------------------------------------------------------------------
   
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isMyOrdersOpen, setIsMyOrdersOpen] = useState(false); // අලුත් state එක
   
   const [portion, setPortion] = useState('Full');
   const [meat, setMeat] = useState('Chicken');
-  
   const [itemQty, setItemQty] = useState(1);
-  
   const [curryType, setCurryType] = useState('Chicken');
   const [currySize, setCurrySize] = useState('Gravy Only');
   const [totalPrice, setTotalPrice] = useState(0);
@@ -92,12 +89,7 @@ export default function WeekOutApp() {
         en: selectedItem.type === 'paratha' || qty === 1 ? selectedItem.name.en : `${qty} x ${selectedItem.name.en}`,
         si: selectedItem.type === 'paratha' || qty === 1 ? selectedItem.name.si : `${qty} x ${selectedItem.name.si}`
       },
-      portion, 
-      meat, 
-      qty: qty, 
-      curryType, 
-      currySize, 
-      price: totalPrice
+      portion, meat, qty: qty, curryType, currySize, price: totalPrice
     };
     
     setCartItems([...cartItems, newItem]);
@@ -119,12 +111,17 @@ export default function WeekOutApp() {
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight hidden sm:block">Week <span className="text-orange-600">Out</span></h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-full border">
               <button onClick={() => setLang('en')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'en' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>EN</button>
               <button onClick={() => setLang('si')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'si' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>සිංහල</button>
             </div>
             
+            {/* අලුත් My Orders බොත්තම */}
+            <button onClick={() => setIsMyOrdersOpen(true)} className="px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-zinc-800 text-white hover:bg-orange-600">
+               {lang === 'en' ? 'My Orders' : 'ඇණවුම්'}
+            </button>
+
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:text-orange-600 transition">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
@@ -162,15 +159,11 @@ export default function WeekOutApp() {
 
       {selectedItem && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div 
-            className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
+          <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             <button onClick={() => setSelectedItem(null)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 text-xl font-bold">✕</button>
             <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-6 border-b pb-4">{selectedItem.name[lang]}</h3>
 
             <div className="space-y-5">
-              
               {['standard', 'biryani'].includes(selectedItem.type) && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.portion[lang]}</label>
@@ -232,42 +225,18 @@ export default function WeekOutApp() {
                 <p className="text-sm text-gray-500 font-medium">Total Amount</p>
                 <p className="text-2xl font-black text-gray-950">Rs. {totalPrice}.00</p>
               </div>
-              <button onClick={handleAddToCart} className="px-6 py-3 rounded-full font-bold bg-orange-600 text-white hover:bg-orange-700 shadow-lg transform active:scale-95 transition-all">
-                Add To Cart
-              </button>
+              <button onClick={handleAddToCart} className="px-6 py-3 rounded-full font-bold bg-orange-600 text-white hover:bg-orange-700 shadow-lg transform active:scale-95 transition-all">Add To Cart</button>
             </div>
           </div>
         </div>
       )}
 
-      {isCartOpen && (
-        <Cart 
-          cartItems={cartItems} 
-          removeFromCart={removeFromCart} 
-          closeCart={() => setIsCartOpen(false)} 
-          lang={lang} 
-          openCheckout={() => {
-            setIsCartOpen(false);
-            setIsCheckoutOpen(true);
-          }}
-        />
-      )}
+      {/* අලුතින් එකතු කරපු My Orders Modal එක */}
+      {isMyOrdersOpen && <MyOrders goBack={() => setIsMyOrdersOpen(false)} lang={lang} />}
 
-      {isCheckoutOpen && (
-        <Checkout 
-          cartItems={cartItems}
-          subTotal={cartItems.reduce((sum, item) => sum + item.price, 0)} 
-          goBack={() => {
-            setIsCheckoutOpen(false);
-            setIsCartOpen(true);
-          }} 
-          lang={lang} 
-          clearCart={() => {
-            setCartItems([]);
-            setIsCheckoutOpen(false);
-          }}
-        />
-      )}
+      {isCartOpen && <Cart cartItems={cartItems} removeFromCart={removeFromCart} closeCart={() => setIsCartOpen(false)} lang={lang} openCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} />}
+
+      {isCheckoutOpen && <Checkout cartItems={cartItems} subTotal={cartItems.reduce((sum, item) => sum + item.price, 0)} goBack={() => { setIsCheckoutOpen(false); setIsCartOpen(true); }} lang={lang} clearCart={() => { setCartItems([]); setIsCheckoutOpen(false); }} />}
     </div>
   );
 }
