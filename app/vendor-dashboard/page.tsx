@@ -1,86 +1,129 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+
+
+import { useState } from 'react';
+
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 
-export default function VendorDashboard() {
-  const [vendor, setVendor] = useState<any>(null);
-  const [daysLeft, setDaysLeft] = useState(0);
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
-  useEffect(() => {
-    const vId = localStorage.getItem('vendorId');
-    if (!vId) {
-      window.location.href = '/vendor-login';
-      return;
+
+
+export default function VendorLogin() {
+
+  const [phone, setPhone] = useState('');
+
+  const [password, setPassword] = useState('');
+
+  const [loading, setLoading] = useState(false);
+
+
+
+  const handleLogin = async (e: any) => {
+
+    e.preventDefault();
+
+    setLoading(true);
+
+
+
+    try {
+
+      const q = query(collection(db, 'vendors'), 
+
+                where("mobilePhone", "==", phone), 
+
+                where("password", "==", password));
+
+      
+
+      const querySnapshot = await getDocs(q);
+
+
+
+      if (!querySnapshot.empty) {
+
+        const vendorData = querySnapshot.docs[0].data();
+
+        // ලොගින් වුණාම නියෝජිතයාගේ තොරතුරු තාවකාලිකව සේව් කරගන්නවා
+
+        localStorage.setItem('vendorId', querySnapshot.docs[0].id);
+
+        localStorage.setItem('vendorName', vendorData.fullName);
+
+        localStorage.setItem('vendorCity', vendorData.city);
+
+        
+
+        window.location.href = '/vendor-dashboard';
+
+      } else {
+
+        alert("දුරකථන අංකය හෝ මුද්‍රිත පදය (Password) වැරදියි!");
+
+      }
+
+    } catch (error) {
+
+      alert("Error logging in: " + error);
+
     }
 
-    const fetchVendor = async () => {
-      const docSnap = await getDoc(doc(db, 'vendors', vId));
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setVendor(data);
+    setLoading(false);
 
-        // Trial ඉතිරි දින ගණන සෙවීම
-        const end = data.trialEndDate.toDate();
-        const now = new Date();
-        const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 3600 * 24));
-        setDaysLeft(diff > 0 ? diff : 0);
-      }
-    };
-    fetchVendor();
-  }, []);
+  };
 
-  if (!vendor) return <div className="p-10 text-center font-bold">පූරණය වෙමින් පවතී...</div>;
+
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans">
-      {/* Header */}
-      <div className="bg-zinc-900 p-6 text-white flex justify-between items-center shadow-xl border-b-4 border-orange-500">
-        <div>
-          <h1 className="text-xl font-black italic uppercase">Rasa.lk Vendor</h1>
-          <p className="text-xs text-orange-400 font-bold">Welcome, {vendor.fullName}</p>
-        </div>
-        <button onClick={() => {localStorage.clear(); window.location.href='/vendor-login'}} className="text-xs font-bold border border-gray-600 px-3 py-1 rounded-lg">Logout</button>
-      </div>
 
-      <div className="p-4 sm:p-8 max-w-4xl mx-auto">
-        
-        {/* Trial Status Card */}
-        <div className={`p-6 rounded-3xl shadow-lg mb-8 text-white flex justify-between items-center ${daysLeft > 0 ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-red-600'}`}>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+
+      <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100">
+
+        <div className="text-center mb-8">
+
+          <div className="bg-orange-500 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white text-3xl mb-4 shadow-lg">👨‍🍳</div>
+
+          <h2 className="text-2xl font-black text-gray-900 uppercase italic">Vendor Login</h2>
+
+          <p className="text-gray-500 font-bold text-sm">Rasa.lk නියෝජිත පුවරුවට ඇතුළු වන්න</p>
+
+        </div>
+
+
+
+        <form onSubmit={handleLogin} className="space-y-6">
+
           <div>
-            <h2 className="text-lg font-black uppercase">Trial Period Status</h2>
-            <p className="text-sm font-bold opacity-80">ඔබේ නොමිලේ අත්හදා බැලීමේ කාලය</p>
-          </div>
-          <div className="text-center">
-            <span className="text-4xl font-black">{daysLeft}</span>
-            <p className="text-[10px] font-bold uppercase">Days Left</p>
-          </div>
-        </div>
 
-        {daysLeft === 0 && !vendor.isPaid && (
-          <div className="bg-yellow-100 border-2 border-yellow-400 p-6 rounded-3xl mb-8 text-center">
-            <h3 className="text-yellow-800 font-black text-xl mb-2">⚠️ කාලය අවසන්!</h3>
-            <p className="text-yellow-700 font-bold mb-4">ඔබේ නොමිලේ ලබාදුන් සති 2ක කාලය අවසන් වී ඇත. ඉදිරියට ඕඩර් ලබා ගැනීමට කරුණාකර රෙජිස්ට්‍රේෂන් ගාස්තු ගෙවා තහවුරු කරන්න.</p>
-            <button className="bg-zinc-900 text-white px-8 py-3 rounded-xl font-black uppercase">ගෙවීම් සිදු කරන්න</button>
-          </div>
-        )}
+            <label className="block text-sm font-bold text-gray-700 mb-2">ජංගම දුරකථන අංකය</label>
 
-        {/* Dashboard Menu Items (Placeholder for now) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white p-8 rounded-3xl shadow-sm border-2 border-gray-50 flex flex-col items-center justify-center text-center cursor-pointer hover:border-orange-500 transition-all">
-             <div className="text-4xl mb-3">🍔</div>
-             <h3 className="font-black text-gray-800 uppercase">නව ඇණවුම් (New Orders)</h3>
-             <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-black mt-2">Coming Soon</span>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-4 focus:border-orange-500 focus:outline-none font-bold" placeholder="07XXXXXXXX" required />
+
           </div>
-          <div className="bg-white p-8 rounded-3xl shadow-sm border-2 border-gray-50 flex flex-col items-center justify-center text-center cursor-pointer hover:border-orange-500 transition-all">
-             <div className="text-4xl mb-3">💰</div>
-             <h3 className="font-black text-gray-800 uppercase">මගේ ආදායම (My Earnings)</h3>
-             <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-black mt-2">Coming Soon</span>
+
+          <div>
+
+            <label className="block text-sm font-bold text-gray-700 mb-2">මුද්‍රිත පදය (Password)</label>
+
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-4 focus:border-orange-500 focus:outline-none font-bold" placeholder="****" required />
+
           </div>
-        </div>
+
+          <button type="submit" disabled={loading} className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl hover:bg-orange-600 transition-all uppercase tracking-widest">
+
+            {loading ? 'සම්බන්ධ වෙමින්...' : 'ඇතුළු වන්න'}
+
+          </button>
+
+        </form>
 
       </div>
+
     </div>
+
   );
+
 }
