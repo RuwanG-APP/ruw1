@@ -27,7 +27,6 @@ export default function MyOrders({ goBack, lang }: any) {
         }
       });
       
-      // අලුත්ම ඕඩර් එක උඩින්ම පෙන්වීමට
       fetchedOrders.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
 
       setOrders(fetchedOrders);
@@ -49,12 +48,21 @@ export default function MyOrders({ goBack, lang }: any) {
       return;
     }
     
-    const confirmCancel = window.confirm(lang === 'en' ? "Are you sure? 85% of the total will be refunded to your Wallet." : "ඔබට විශ්වාසද? මුළු මුදලින් 85% ක් ඔබගේ Wallet එකට එකතු වේ.");
+    // --- අපේ සාධාරණ සහ නඩු නොවැටෙන ගණිතය ---
+    const paidAmount = Number(order.totalAmount || 0); // අද අතින්/කාඩ් එකෙන් අලුතින් ගෙවපු ගාණ
+    const walletUsed = Number(order.walletUsed || 0);  // පරණ Wallet එකෙන් පාවිච්චි කරපු ගාණ
+    
+    // අලුත් සල්ලි වලින් 85% ක් කස්ටමර්ට (15% අපේ ලාභය)
+    const refundFromPaid = Math.round(paidAmount * 0.85); 
+    
+    // පරණ සල්ලි 100% ක්ම ආපහු දෙනවා. මුළු එකතුව තමයි වොලට් එකට යන්නේ.
+    const totalRefund = walletUsed + refundFromPaid;      
+
+    const confirmCancel = window.confirm(lang === 'en' ? `Are you sure? Rs.${totalRefund} will be refunded to your Wallet.` : `ඔබට විශ්වාසද? රු.${totalRefund} ක් ඔබගේ Wallet එකට එකතු වේ.`);
     if (!confirmCancel) return;
 
     setLoading(true);
     try {
-      const refundAmount = Math.round(order.totalAmount * 0.85); 
       const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Colombo', hour: '2-digit', minute:'2-digit', hour12: true });
       
       await updateDoc(doc(db, "orders", order.id), {
@@ -63,10 +71,10 @@ export default function MyOrders({ goBack, lang }: any) {
       });
 
       await setDoc(doc(db, "wallets", phone), {
-         balance: increment(refundAmount)
+         balance: increment(totalRefund)
       }, { merge: true });
 
-      alert(lang === 'en' ? `Success! Rs.${refundAmount} added to your wallet.` : `සාර්ථකයි! රු.${refundAmount} ක් ඔබගේ Wallet එකට එකතු විය.`);
+      alert(lang === 'en' ? `Success! Rs.${totalRefund} added to your wallet.` : `සාර්ථකයි! රු.${totalRefund} ක් ඔබගේ Wallet එකට එකතු විය.`);
       fetchOrders(); 
     } catch (error) {
       console.error(error);
@@ -100,10 +108,14 @@ export default function MyOrders({ goBack, lang }: any) {
 
         <div className="space-y-4">
           {orders.map((o, i) => {
-            // බොත්තම් Disable කිරීම සඳහා Condition එක
             const isCancelled = o.status.toLowerCase().includes('cancel');
             const isHandovered = o.status.toLowerCase().includes('handover');
             const isPast2PM = new Date().getHours() >= 14;
+            
+            const oPaid = Number(o.totalAmount || 0);
+            const oWallet = Number(o.walletUsed || 0);
+            // බොත්තමේ පෙන්නන ගාණත් අර සාධාරණ ගණිතයටම හැදුවා
+            const showRefund = oWallet + Math.round(oPaid * 0.85);
 
             return (
             <div key={i} className="border-2 border-gray-200 p-4 rounded-xl">
@@ -111,22 +123,26 @@ export default function MyOrders({ goBack, lang }: any) {
                  <span className="font-mono text-xs font-bold text-zinc-500">{o.orderID}</span>
                  <span className={`text-xs font-black px-2 py-1 rounded ${isCancelled ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
                </div>
-               <div className="text-sm font-bold text-gray-800 mb-3">
-                 {lang === 'en' ? 'Total: Rs.' : 'එකතුව: රු.'} {o.totalAmount}.00
+               <div className="text-sm font-bold text-gray-800 mb-1">
+                 {lang === 'en' ? 'Paid Amount: Rs.' : 'ගෙවූ මුදල: රු.'} {o.totalAmount}.00
                </div>
+               {o.walletUsed > 0 && (
+                 <div className="text-xs font-bold text-green-600 mb-2">
+                   Wallet Used: Rs. {o.walletUsed}.00
+                 </div>
+               )}
                
-               {/* Handover හෝ Cancel කරපු ඒවාට අළු පාට Disabled බොත්තම පෙන්නනවා */}
                {(isCancelled || isHandovered) ? (
-                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed">
+                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed mt-2">
                    {lang === 'en' ? 'Not Eligible for Cancellation' : 'මෙය අවලංගු කළ නොහැක'}
                  </button>
                ) : isPast2PM ? (
-                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed">
+                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed mt-2">
                    {lang === 'en' ? 'Cancellation time (2 PM) has passed' : 'ප.ව 2:00 පසු වී ඇති බැවින් අවලංගු කළ නොහැක'}
                  </button>
                ) : (
-                 <button onClick={() => handleCancel(o)} className="w-full bg-red-100 text-red-600 border border-red-200 py-2 rounded-lg font-bold text-sm hover:bg-red-600 hover:text-white transition-colors">
-                   {lang === 'en' ? 'Cancel Order & Get 85% Refund' : 'ඇණවුම අවලංගු කර 85% ක් ලබාගන්න'}
+                 <button onClick={() => handleCancel(o)} className="w-full bg-red-100 text-red-600 border border-red-200 py-2 rounded-lg font-bold text-sm hover:bg-red-600 hover:text-white transition-colors mt-2">
+                   {lang === 'en' ? `Cancel Order & Get Rs.${showRefund} Refund` : `ඇණවුම අවලංගු කර රු.${showRefund} ක් ලබාගන්න`}
                  </button>
                )}
             </div>
