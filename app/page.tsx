@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +6,6 @@ import Image from 'next/image';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 
-// --- DATA STRUCTURE ---
 export const menuItems = [
   { id: 'kottu', name: { en: 'Kottu', si: 'කොත්තු' }, image: '/image_0.png', type: 'standard' },
   { id: 'paratha', name: { en: 'Paratha', si: 'පරාටා' }, image: '/image_1.png', type: 'paratha' },
@@ -31,16 +30,13 @@ export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   
-  // --- Cart States ---
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   
-  // Modal States
   const [portion, setPortion] = useState('Full');
   const [meat, setMeat] = useState('Chicken');
   
-  // පොදු Quantity State එකක් හැදුවා හැම කෑමකටම
   const [itemQty, setItemQty] = useState(1);
   
   const [curryType, setCurryType] = useState('Chicken');
@@ -51,7 +47,7 @@ export default function WeekOutApp() {
     if (selectedItem) {
       setPortion('Full');
       setMeat(selectedItem.type === 'standard' || selectedItem.type === 'devilled' ? 'Chicken' : 'Vegi');
-      setItemQty(1); // අලුත් කෑමක් ගද්දි Quantity එක 1 වෙනවා
+      setItemQty(1);
       setCurryType('Chicken');
       setCurrySize('Gravy Only');
     }
@@ -63,7 +59,6 @@ export default function WeekOutApp() {
 
     const qty = parseInt(itemQty.toString()) || 1;
 
-    // මිල ගණනය කිරීම Qty එකෙන් ගුණ වෙන විදිහට හැදුවා
     if (selectedItem.type === 'standard') {
       const stdPrices: any = { Vegi: { Full: 700, Half: 500 }, Fish: { Full: 800, Half: 600 }, Pork: { Full: 900, Half: 700 }, Chicken: { Full: 850, Half: 650 } };
       price = (stdPrices[meat]?.[portion] || 0) * qty;
@@ -85,13 +80,11 @@ export default function WeekOutApp() {
     setTotalPrice(price);
   }, [selectedItem, portion, meat, itemQty, curryType, currySize]);
 
-  // --- Add To Cart Function ---
   const handleAddToCart = () => {
     const qty = parseInt(itemQty.toString()) || 1;
 
     const newItem = {
       ...selectedItem,
-      // Checkout එක වෙනස් නොකර ඉන්න, Quantity එක නමටම එකතු කළා
       name: {
         en: selectedItem.type === 'paratha' || qty === 1 ? selectedItem.name.en : `${qty} x ${selectedItem.name.en}`,
         si: selectedItem.type === 'paratha' || qty === 1 ? selectedItem.name.si : `${qty} x ${selectedItem.name.si}`
@@ -105,8 +98,8 @@ export default function WeekOutApp() {
     };
     
     setCartItems([...cartItems, newItem]);
-    setSelectedItem(null); // Close modal
-    setIsCartOpen(true); // Open cart automatically
+    setSelectedItem(null);
+    setIsCartOpen(true);
   };
 
   const removeFromCart = (indexToRemove: number) => {
@@ -116,7 +109,6 @@ export default function WeekOutApp() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
       
-      {/* HEADER */}
       <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-gray-100">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -130,7 +122,6 @@ export default function WeekOutApp() {
               <button onClick={() => setLang('si')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'si' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>සිංහල</button>
             </div>
             
-            {/* Cart Button in Header */}
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:text-orange-600 transition">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
@@ -145,7 +136,6 @@ export default function WeekOutApp() {
         </nav>
       </header>
 
-      {/* MAIN MENU */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-extrabold text-gray-950 tracking-tighter">{translations.categoryTitle[lang]}</h2>
@@ -167,10 +157,8 @@ export default function WeekOutApp() {
         </div>
       </main>
 
-      {/* CUSTOMIZATION MODAL */}
       {selectedItem && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          {/* මෙතන තමයි Apple Fix එක දැම්මේ (overscroll-contain සහ WebkitOverflowScrolling) */}
           <div 
             className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain"
             style={{ WebkitOverflowScrolling: 'touch' }}
@@ -180,7 +168,6 @@ export default function WeekOutApp() {
 
             <div className="space-y-5">
               
-              {/* Portion Selection */}
               {['standard', 'biryani'].includes(selectedItem.type) && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.portion[lang]}</label>
@@ -192,7 +179,6 @@ export default function WeekOutApp() {
                 </div>
               )}
 
-              {/* Meat Selection */}
               {['standard', 'devilled'].includes(selectedItem.type) && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.meat[lang]}</label>
@@ -205,7 +191,6 @@ export default function WeekOutApp() {
                 </div>
               )}
 
-              {/* Common Quantity Selector (+ / -) */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.qty[lang]}</label>
                 <div className="flex items-center gap-3">
@@ -215,7 +200,6 @@ export default function WeekOutApp() {
                 </div>
               </div>
 
-              {/* Paratha Specifics */}
               {selectedItem.type === 'paratha' && (
                 <>
                   <div>
@@ -253,7 +237,6 @@ export default function WeekOutApp() {
         </div>
       )}
 
-      {/* CART COMPONENT */}
       {isCartOpen && (
         <Cart 
           cartItems={cartItems} 
@@ -267,7 +250,6 @@ export default function WeekOutApp() {
         />
       )}
 
-      {/* CHECKOUT COMPONENT */}
       {isCheckoutOpen && (
         <Checkout 
           cartItems={cartItems}
