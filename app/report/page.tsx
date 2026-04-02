@@ -41,9 +41,11 @@ export default function DailyReport() {
   }, [selectedDate]);
 
   const breakdown = orders.reduce((acc, order) => {
-    // ඕඩරය කැන්සල් කරලා නම්, 15% ක ලාභය විතරක් එකතු කරනවා
+    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන්න totalPrice සහ totalAmount දෙකම චෙක් කරයි
+    const orderTotal = Number(order.totalPrice || order.totalAmount || 0);
+
     if (order.status.includes('Cancelled')) {
-       acc.cancellationFees += (Number(order.totalAmount) * 0.15);
+       acc.cancellationFees += (orderTotal * 0.15);
        return acc;
     }
 
@@ -66,11 +68,12 @@ export default function DailyReport() {
   const totalNetProfit = baseProfit + breakdown.cancellationFees;
 
   const grandTotalAll = orders.reduce((sum, o) => {
-    // කැන්සල් කරපු ඕඩර් වලින් 15% ක් විතරයි Grand Total එකට එකතු වෙන්නේ (Cash in hand)
+    // 🛡️ Fix: Grand Total එකටත් නිවැරදි ගාණ ගැනීම
+    const t = Number(o.totalPrice || o.totalAmount || 0);
     if (o.status.includes('Cancelled')) {
-      return sum + (Number(o.totalAmount) * 0.15);
+      return sum + (t * 0.15);
     }
-    return sum + Number(o.totalAmount ?? 0);
+    return sum + t;
   }, 0);
 
   const printSlip = (order: any, type: string) => {
@@ -137,10 +140,10 @@ export default function DailyReport() {
     if (isBill) {
       content += `
             <div class="totals">
-              <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>Rs. ${Number(order.subTotal).toFixed(2)}</span></div>
-              <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>Rs. ${Number(order.deliveryFee).toFixed(2)}</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>Rs. ${Number(order.subTotal || 0).toFixed(2)}</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>Rs. ${Number(order.deliveryFee || 0).toFixed(2)}</span></div>
               ${order.walletUsed ? `<div style="display:flex;justify-content:space-between"><span>Wallet:</span><span>-Rs. ${order.walletUsed}.00</span></div>` : ''}
-              <div class="grand"><span>TOTAL:</span><span>Rs. ${Number(order.totalAmount).toFixed(2)}</span></div>
+              <div class="grand"><span>TOTAL:</span><span>Rs. ${Number(order.totalPrice || order.totalAmount || 0).toFixed(2)}</span></div>
             </div>
             <div class="promo">
                3-10% Discount<br/>
@@ -202,11 +205,11 @@ export default function DailyReport() {
                   <td className="p-3 font-mono font-bold text-center border-r-2 border-black">{o.orderID}</td>
                   <td className="p-3 uppercase border-r-2 border-black">
                     <b className="text-blue-700 underline block mb-1">{o.customerName}</b>
-                    <div className="text-[10px] text-zinc-500 font-bold italic">{o.items.map((it:any)=>`${it.qty}x ${it.name.replace(/^\\d+\\s*x\\s*/i, '')}`).join(", ")}</div>
+                    <div className="text-[10px] text-zinc-500 font-bold italic">{o.items?.map((it:any)=>`${it.qty}x ${it.name.replace(/^\d+\s*x\s*/i, '')}`).join(", ")}</div>
                   </td>
-                  <td className="p-3 text-right font-black bg-zinc-50 border-r-2 border-black text-lg">Rs. {o.totalAmount}.00</td>
+                  {/* 🛡️ Fix: වගුවේ මුදල පෙන්වන තැන */}
+                  <td className="p-3 text-right font-black bg-zinc-50 border-r-2 border-black text-lg">Rs. {Number(o.totalPrice || o.totalAmount || 0).toFixed(2)}</td>
                   <td className="p-3 text-center">
-                    {/* කැන්සල් කරපු ඕඩර් වලට රතු පාටින් පණිවිඩය පෙන්නනවා, බොත්තම් හැංගෙනවා */}
                     {o.status.includes('Cancelled') ? (
                       <div className="text-red-600 font-bold text-xs uppercase animate-pulse">
                         Cancelled by Customer at {o.cancelledAtTime || 'Before 2 PM'}
@@ -236,7 +239,6 @@ export default function DailyReport() {
                 </div>
                 ))}
                 
-                {/* අලුතින් ලැබෙන 15% ලාභය වෙනම පෙන්නනවා */}
                 {breakdown.cancellationFees > 0 && (
                   <div className="flex justify-between border-b-2 border-dashed border-red-200 pb-1 font-black uppercase text-xs mt-4 pt-2">
                       <span className="text-red-600">Cancellation Fees (15%)</span>
