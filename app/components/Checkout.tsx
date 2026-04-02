@@ -9,7 +9,7 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [isCityLimit, setIsCityLimit] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState('COD');
+  const [paymentMethod, setPaymentMethod] = useState('Online');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const deliveryFee = isCityLimit ? 150 : 250;
@@ -28,38 +28,43 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
       const datePart = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
       const customOrderID = `WO-${datePart}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
-      // 1. Firebase එකට දත්ත යැවීම
+      // 1. Firebase එකට දත්ත යැවීම (මාලාගේ Dashboard එකට ඕන විදිහට)
       await addDoc(collection(db, "orders"), {
         orderID: customOrderID,
         customerName: name,
         phone: phone,
         address: address,
-        city: "Kegalle", 
+        city: "Kegalle", // Dashboard එකේ filtering සඳහා
         area: isCityLimit ? 'City Limit' : 'Out of City',
         paymentMethod: paymentMethod,
         items: cartItems.map((item: any) => ({
             name: item.name.en || item.name,
             qty: item.qty || 1,
             price: item.price,
-            details: item.type === 'paratha' ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` : `${item.portion} - ${item.meat}`
+            details: item.details || ''
         })),
-        totalPrice: finalTotal, 
+        totalPrice: finalTotal, // Dashboard එකේ මුදල පෙන්වීමට
         status: "Pending",
         createdAt: serverTimestamp(),
       });
 
-      // 2. WhatsApp මැසේජ් එක සම්පූර්ණ විස්තර සහිතව සකස් කිරීම
+      // 2. WhatsApp මැසේජ් එක (සම්පූර්ණ විස්තර සහිත පරණ Format එක)
       let message = `❖ *NEW ORDER: ${customOrderID}* ❖\n\n`;
-      message += `*Customer Details:*\n❖ Name: ${name}\n❖ Phone: ${phone}\n❖ Address: ${address}\n❖ Area: ${isCityLimit ? 'City Limit' : 'Out of City'}\n\n`;
+      message += `*Customer Details:*\n❖ Name: ${name}\n❖ Phone: ${phone}\n❖ Address: ${address}\n❖ Area: ${isCityLimit ? 'City Limit' : 'Out of City'}\n❖ Payment: ${paymentMethod}\n\n`;
       
-      message += `*Order Items:*\n`;
+      message += `*Order Details:*\n`;
       cartItems.forEach((item: any, index: number) => {
-        let itemDetails = item.type === 'paratha' ? `${item.qty} Nos, ${item.curryType} (${item.currySize})` : `${item.portion} - ${item.meat}`;
-        message += `${index + 1}. ${item.name.en || item.name} (${itemDetails}) - Rs.${item.price}\n`;
+        let nameStr = item.name.en || item.name;
+        let qtyStr = item.qty || 1;
+        message += `${index + 1}. ${qtyStr} x ${nameStr} (${item.details || ''}) - Rs.${item.price * qtyStr}\n`;
       });
 
       message += `\n*Billing:*\nSubtotal: Rs.${subTotal}\nDelivery Fee: Rs.${deliveryFee}\n`;
-      message += `*Total to Pay: Rs.${finalTotal}.00*\n`;
+      message += `*Total to Pay: Rs.${finalTotal}*\n\n`;
+
+      if (paymentMethod === 'Online') {
+        message += `*(Note: Online Payment Selected - Send Payment Link)*`;
+      }
 
       clearCart();
       const whatsappNumber = '94760829235'; 
@@ -96,8 +101,8 @@ export default function Checkout({ cartItems, subTotal, goBack, lang, clearCart 
         </form>
 
         <div className="mt-6 bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-1 font-bold text-gray-600 font-sans">
-          <div className="flex justify-between text-sm uppercase tracking-tighter"><span>Subtotal:</span><span>Rs. {subTotal}.00</span></div>
-          <div className="flex justify-between text-sm pb-2 border-b uppercase tracking-tighter"><span>Delivery:</span><span>Rs. {deliveryFee}.00</span></div>
+          <div className="flex justify-between text-sm"><span>Subtotal:</span><span>Rs. {subTotal}.00</span></div>
+          <div className="flex justify-between text-sm pb-2 border-b"><span>Delivery Fee:</span><span>Rs. {deliveryFee}.00</span></div>
           <div className="flex justify-between text-xl text-gray-900 pt-2 font-black italic tracking-tighter"><span>TOTAL:</span><span>Rs. {finalTotal}.00</span></div>
         </div>
 
