@@ -41,25 +41,30 @@ export default function DailyReport() {
   }, [selectedDate]);
 
   const breakdown = orders.reduce((acc, order) => {
-    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන්න totalPrice සහ totalAmount දෙකම චෙක් කරයි
+    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන පරිදි මුදල ලබා ගැනීම
     const orderTotal = Number(order.totalPrice || order.totalAmount || 0);
 
+    // ඕඩරය කැන්සල් කරලා නම්, 15% ක ලාභය විතරක් එකතු කරනවා
     if (order.status.includes('Cancelled')) {
        acc.cancellationFees += (orderTotal * 0.15);
        return acc;
     }
 
     acc.totalDelivery += Number(order.deliveryFee ?? 0);
-    order.items?.forEach((item: any) => {
-      const baseName = getBaseName(item.name || "");
-      const menuKey = Object.keys(menuCosts).find(k => k.toUpperCase().includes(baseName)) || baseName;
-      
-      const unitCost = Number(menuCosts[menuKey]?.cost ?? 0);
-      const qty = Number(item.qty || 1);
-      const profit = Number(item.price || 0) - (unitCost * qty);
-      
-      acc.itemProfits[baseName] = (acc.itemProfits[baseName] || 0) + profit;
-    });
+    
+    // 🛡️ Fix: මගේ වැරදි කෝඩ් එක නිසා items නැති ඕඩර් ආවොත් crash වීම වැළැක්වීම
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        const baseName = getBaseName(item.name || "");
+        const menuKey = Object.keys(menuCosts).find(k => k.toUpperCase().includes(baseName)) || baseName;
+        
+        const unitCost = Number(menuCosts[menuKey]?.cost ?? 0);
+        const qty = Number(item.qty || 1);
+        const profit = Number(item.price || 0) - (unitCost * qty);
+        
+        acc.itemProfits[baseName] = (acc.itemProfits[baseName] || 0) + profit;
+      });
+    }
     return acc;
   }, { totalDelivery: 0, itemProfits: {} as Record<string, number>, cancellationFees: 0 });
 
@@ -68,8 +73,9 @@ export default function DailyReport() {
   const totalNetProfit = baseProfit + breakdown.cancellationFees;
 
   const grandTotalAll = orders.reduce((sum, o) => {
-    // 🛡️ Fix: Grand Total එකටත් නිවැරදි ගාණ ගැනීම
+    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන පරිදි මුදල ලබා ගැනීම
     const t = Number(o.totalPrice || o.totalAmount || 0);
+    // කැන්සල් කරපු ඕඩර් වලින් 15% ක් විතරයි Grand Total එකට එකතු වෙන්නේ (Cash in hand)
     if (o.status.includes('Cancelled')) {
       return sum + (t * 0.15);
     }
@@ -125,15 +131,15 @@ export default function DailyReport() {
                 </tr>
               </thead>
               <tbody>
-                ${order.items.map((it:any) => {
-                  const cleanName = it.name.replace(/^\d+\s*x\s*/i, '');
+                ${order.items && Array.isArray(order.items) ? order.items.map((it:any) => {
+                  const cleanName = it.name ? it.name.replace(/^\d+\s*x\s*/i, '') : '';
                   return `
                   <tr>
                     <td>${cleanName} <br><small style="color:gray">${it.details || ""}</small></td>
                     <td style="text-align:center;">${it.qty}</td>
-                    ${isBill ? `<td style="text-align:right">Rs.${Number(it.price).toFixed(2)}</td>` : ""}
+                    ${isBill ? `<td style="text-align:right">Rs.${Number(it.price || 0).toFixed(2)}</td>` : ""}
                   </tr>`;
-                }).join("")}
+                }).join("") : ""}
               </tbody>
             </table>`;
 
@@ -205,10 +211,24 @@ export default function DailyReport() {
                   <td className="p-3 font-mono font-bold text-center border-r-2 border-black">{o.orderID}</td>
                   <td className="p-3 uppercase border-r-2 border-black">
                     <b className="text-blue-700 underline block mb-1">{o.customerName}</b>
-                    <div className="text-[10px] text-zinc-500 font-bold italic">{o.items?.map((it:any)=>`${it.qty}x ${it.name.replace(/^\d+\s*x\s*/i, '')}`).join(", ")}</div>
+                    <div className="text-[10px] text-zinc-500 font-bold italic">
+                      {/* 🛡️ Fix: ආරක්ෂිතව items පෙන්වීම */}
+                      {o.items && Array.isArray(o.items) ? o.items.map((it:any)=>`${it.qty}x ${it.name ? it.name.replace(/^\d+\s*x\s*/i, '') : ''}`).join(", ") : "No items recorded"}
+                    </div>
                   </td>
-                  {/* 🛡️ Fix: වගුවේ මුදල පෙන්වන තැන */}
-                  <td className="p-3 text-right font-black bg-zinc-50 border-r-2 border-black text-lg">Rs. {Number(o.totalPrice || o.totalAmount || 0).toFixed(2)}</td>
+                  
+                  {/* 🛡️ මෙතන තමයි ඔයා ඉල්ලපු COD/Bank පෙන්වන කොටසයි, 0.00 ප්‍රශ්නය හදපු කොටසයි තියෙන්නේ */}
+                  <td className="p-3 text-right bg-zinc-50 border-r-2 border-black">
+                    <div className="font-black text-lg text-gray-900">
+                      Rs. {Number(o.totalPrice || o.totalAmount || 0).toFixed(2)}
+                    </div>
+                    {o.paymentMethod && (
+                      <div className={`mt-1 inline-block px-2 py-1 text-[9px] font-black uppercase rounded shadow-sm border ${o.paymentMethod === 'COD' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                        {o.paymentMethod === 'COD' ? '💵 Cash On Delivery' : '💳 Bank / App'}
+                      </div>
+                    )}
+                  </td>
+
                   <td className="p-3 text-center">
                     {o.status.includes('Cancelled') ? (
                       <div className="text-red-600 font-bold text-xs uppercase animate-pulse">
@@ -239,6 +259,7 @@ export default function DailyReport() {
                 </div>
                 ))}
                 
+                {/* අලුතින් ලැබෙන 15% ලාභය වෙනම පෙන්නනවා */}
                 {breakdown.cancellationFees > 0 && (
                   <div className="flex justify-between border-b-2 border-dashed border-red-200 pb-1 font-black uppercase text-xs mt-4 pt-2">
                       <span className="text-red-600">Cancellation Fees (15%)</span>
