@@ -70,21 +70,34 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
       const now = new Date();
       const dateStr = now.toLocaleDateString('en-GB'); // DD/MM/YYYY
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-      const orderID = `WO-${Math.floor(100000 + Math.random() * 900000)}`;
+      
+      const datePart = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+      const orderID = `WO-${datePart}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
-      // 1. Firebase එකට දත්ත යැවීම (Dashboard එක සඳහා totalPrice අනිවාර්යයි)
+      // 🛡️ FIX: ඩේටාබේස් එකට යන දත්ත වලට මගහැරුණු deliveryFee, subTotal සහ items නැවත එකතු කිරීම
       await addDoc(collection(db, "orders"), {
         orderID,
         customerName: name,
         phone: fullPhone,
         address,
         city: livingCity.toUpperCase(),
-        totalPrice: finalTotal, // ⬅️ මාලාගේ Dashboard එකේ මිල පෙන්වීමට මෙය අත්‍යවශ්‍යයි
+        area: isCityLimit ? 'City Limit' : 'Out of City',
+        paymentMethod: paymentMethod,
+        items: cartItems.map((item: any) => ({
+            name: item.name?.en || item.name || '',
+            qty: item.qty || 1,
+            price: Number(item.price) || 0,
+            details: item.details || ''
+        })),
+        subTotal: Number(subTotal),
+        deliveryFee: Number(deliveryFee),
+        totalPrice: Number(finalTotal),
+        totalAmount: Number(finalTotal), // රිපෝට් එකට සහය වීමට
         status: "Pending",
         createdAt: serverTimestamp(),
       });
 
-      // 2. WhatsApp මැසේජ් එක සැකසීම (Screenshot එකේ පරිදි)
+      // 2. WhatsApp මැසේජ් එක සැකසීම
       let message = `❖ *NEW ORDER: ${orderID}* ❖\n`;
       message += `◆ Date: ${dateStr} | ◆ Time: ${timeStr}\n\n`;
       
