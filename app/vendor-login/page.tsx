@@ -1,6 +1,4 @@
-// Ruwan Login Page
 'use client';
-
 import { useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -8,55 +6,53 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 export default function VendorLogin() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(false);
 
-  const handleLogin = async (e: any) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsLoading(true);
+    setError(false);
 
     try {
-      // ඩේටාබේස් එකේ vendors ලිස්ට් එක පරීක්ෂා කිරීම
-      const q = query(collection(db, 'vendors'), 
-                where("mobilePhone", "==", phone), 
-                where("password", "==", password));
-      
+      // 1. වෙන්ඩර්ව සෙවීම (Phone + Password + Approved Status)
+      const q = query(
+        collection(db, 'vendors'),
+        where('phone', '==', phone.trim()),
+        where('password', '==', password.trim()),
+        where('status', '==', 'APPROVED')
+      );
+
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        const vendorDoc = querySnapshot.docs[0];
-        localStorage.setItem('vendorId', vendorDoc.id);
-        // සාර්ථකව ලොග් වුණොත් ඩෑෂ්බෝඩ් එකට යවනවා
+        // 2. සාර්ථක නම් ෆෝන් එක මතක තබා ගෙන ඩෑෂ්බෝඩ් එකට යැවීම
+        localStorage.setItem('vendorPhone', phone.trim());
         window.location.href = '/vendor-dashboard';
       } else {
-        alert("දුරකථන අංකය හෝ මුද්‍රිත පදය (Password) වැරදියි!");
+        // 3. අසාර්ථක නම් Alert එකක් සහ Shake effect එක
+        setError(true);
+        alert("ලොගින් විස්තර වැරදියි හෝ ඔබව තවම අනුමත කර නැත.");
       }
-    } catch (error) {
-      alert("Error logging in: " + error);
+    } catch (err) {
+      alert("දෝෂයක් සිදු විය. නැවත උත්සාහ කරන්න.");
+    } finally {
+      setIsLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-gray-50">
-        <div className="text-center mb-10">
-          {/* Chef Icon */}
-          <div className="bg-zinc-900 w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-white text-4xl mb-4 shadow-xl border-b-4 border-orange-500">👨‍🍳</div>
-          <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">Vendor Login</h2>
-          <p className="text-gray-400 font-bold text-xs mt-1 uppercase tracking-widest">Rasa.lk Partner Portal</p>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6 font-sans">
+      <div className={`sm:mx-auto sm:w-full sm:max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border-b-8 border-orange-600 transition-all ${error ? 'animate-bounce border-red-500' : ''}`}>
+        <div className="text-center mb-8">
+           <h2 className="text-3xl font-black italic tracking-tighter text-zinc-900 uppercase">VENDOR LOGIN</h2>
+           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Rasa.lk Partner Portal</p>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase ml-1">Phone Number</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border-2 border-gray-100 rounded-2xl p-4 focus:border-orange-500 focus:outline-none font-bold text-lg bg-gray-50 transition-all" placeholder="07XXXXXXXX" required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase ml-1">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border-2 border-gray-100 rounded-2xl p-4 focus:border-orange-500 focus:outline-none font-bold text-lg bg-gray-50 transition-all" placeholder="••••" required />
-          </div>
-          <button type="submit" disabled={loading} className="w-full bg-orange-600 text-white font-black py-5 rounded-2xl hover:bg-orange-700 transition-all shadow-lg text-lg uppercase tracking-widest mt-4">
-            {loading ? 'Verifying...' : 'LOG IN NOW'}
+        <form className="space-y-4" onSubmit={handleLogin}>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="PHONE NUMBER" required className="w-full border-2 border-gray-100 bg-gray-50 rounded-2xl p-4 font-bold outline-none focus:border-orange-500" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="PASSWORD" required className="w-full border-2 border-gray-100 bg-gray-50 rounded-2xl p-4 font-bold outline-none focus:border-orange-500" />
+          <button type="submit" disabled={isLoading} className="w-full bg-orange-600 text-white font-black py-5 rounded-3xl shadow-lg hover:bg-zinc-900 transition-all uppercase tracking-widest text-xs">
+            {isLoading ? 'VERIFYING...' : 'LOG IN NOW'}
           </button>
         </form>
       </div>
