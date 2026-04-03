@@ -45,10 +45,25 @@ export default function MyOrders({ goBack, lang }: any) {
 
   const handleCancel = async (order: any) => {
     const currentHour = new Date().getHours();
+    const stat = order.status.toLowerCase();
     
+    // 🛡️ Security Check 1: Time restriction
     if (currentHour >= 14) {
       alert(lang === 'en' ? "Cancellations are only allowed before 2:00 PM." : "ඇණවුම් අවලංගු කළ හැක්කේ ප.ව 2:00 ට පෙර පමණි.");
       return;
+    }
+
+    // 🛡️ Security Check 2: Status restriction (Blocks old and new completed orders)
+    if (stat.includes('deliver') || stat.includes('handover') || stat.includes('complete')) {
+      alert(lang === 'en' ? "This order is already delivered!" : "මෙම ඇණවුම දැනටමත් බෙදාහැර අවසන්ය!");
+      return;
+    }
+    if (stat.includes('accept')) {
+      alert(lang === 'en' ? "This order is being prepared!" : "මෙම ඇණවුම මේ වන විටත් සකස් කරමින් පවතී!");
+      return;
+    }
+    if (stat.includes('cancel')) {
+      return; // Already cancelled, do nothing
     }
     
     const paidAmount = Number(order.totalAmount || 0); 
@@ -113,9 +128,11 @@ export default function MyOrders({ goBack, lang }: any) {
 
         <div className="space-y-4">
           {orders.map((o, i) => {
-            const isCancelled = o.status.toLowerCase().includes('cancel');
-            const isDelivered = o.status.toLowerCase().includes('deliver');
-            const isAccepted = o.status.toLowerCase().includes('accept');
+            const stat = o.status.toLowerCase();
+            const isCancelled = stat.includes('cancel');
+            // Catch both old 'handover' and new 'deliver' statuses
+            const isDelivered = stat.includes('deliver') || stat.includes('handover') || stat.includes('complete');
+            const isAccepted = stat.includes('accept');
             
             // Check if it's past 2:00 PM (14:00)
             const isPast2PM = new Date().getHours() >= 14;
