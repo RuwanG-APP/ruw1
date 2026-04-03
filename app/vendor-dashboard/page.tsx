@@ -13,27 +13,35 @@ export default function VendorDashboard() {
       const savedPhone = localStorage.getItem('vendorPhone');
       if (!savedPhone) { window.location.href = '/vendor-login'; return; }
 
-      // 1. වෙන්ඩර්ගේ විස්තර සොයා ගැනීම (අපේ DB එකේ තියෙන්නේ mobilePhone නමින්)
-      const vQuery = query(collection(db, 'vendors'), where('mobilePhone', '==', savedPhone), limit(1));
-      const vSnap = await getDocs(vQuery);
-      
-      if (!vSnap.empty) {
-        const vData = vSnap.docs[0].data();
-        setVendor(vData);
+      try {
+        // 1. වෙන්ඩර්ගේ විස්තර සොයා ගැනීම (Consistency: 'phone' field එක පාවිච්චි කරයි)
+        const vQuery = query(collection(db, 'vendors'), where('phone', '==', savedPhone.trim()), limit(1));
+        const vSnap = await getDocs(vQuery);
+        
+        if (!vSnap.empty) {
+          const vData = vSnap.docs[0].data();
+          setVendor(vData);
 
-        // 2. ඒ වෙන්ඩර්ගේ නගරයට අදාළ ඕඩර් පමණක් ගෙන ඒම
-        const q = query(
-          collection(db, 'orders'),
-          where('city', '==', vData.city.toUpperCase()), // නගරය CAPITAL එකෙන් සර්ච් කිරීම
-          orderBy('createdAt', 'desc')
-        );
+          // 2. ඒ වෙන්ඩර්ගේ නගරයට අදාළ ඕඩර් පමණක් ගෙන ඒම 
+          // (වැදගත්: මෙහිදී City එක Uppercase කර සර්ච් කරයි)
+          const vendorCity = String(vData.city || '').trim().toUpperCase();
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const q = query(
+            collection(db, 'orders'),
+            where('city', '==', vendorCity), 
+            orderBy('createdAt', 'desc')
+          );
+
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+            setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+          });
+          return () => unsubscribe();
+        } else {
           setLoading(false);
-        });
-        return () => unsubscribe();
-      } else {
+        }
+      } catch (err) {
+        console.error("Dashboard Error:", err);
         setLoading(false);
       }
     };
@@ -54,7 +62,6 @@ export default function VendorDashboard() {
         <button onClick={() => { localStorage.removeItem('vendorPhone'); window.location.href = '/vendor-login'; }} className="bg-zinc-800 px-6 py-2 rounded-full font-black text-[10px] border border-zinc-700 hover:bg-orange-600 transition-all">Logout</button>
       </div>
 
-      {/* Orders Table Style */}
       <div className="max-w-4xl mx-auto space-y-6">
         {orders.map((order) => (
           <div key={order.id} className="bg-white rounded-[2.5rem] shadow-xl border-l-8 border-orange-500 p-8 relative">
@@ -65,19 +72,17 @@ export default function VendorDashboard() {
                 <p className="text-orange-600 font-black text-lg">📞 {order.phone}</p>
                 <p className="text-gray-500 font-bold text-sm tracking-tight">🏠 {order.address}</p>
                 <p className="text-gray-400 font-black text-[9px] mt-4 bg-gray-100 px-4 py-2 rounded-full inline-block tracking-widest">
-                  📅 {order.createdAt?.toDate().toLocaleString()}
+                  📅 {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : 'N/A'}
                 </p>
               </div>
               <div className="text-right">
                 <span className="text-gray-400 text-[10px] font-black block tracking-widest">GRAND TOTAL</span>
-                {/* 🛡️ මෙතන තමයි වැදගත්ම තැන. totalPrice නිවැරදිව පෙන්වීම */}
                 <span className="text-4xl font-black text-gray-900 italic tracking-tighter font-sans">
-                  Rs. {Number(order.totalPrice || 0).toFixed(2)}
+                  Rs. {Number(order.totalAmount || 0).toFixed(2)}
                 </span>
               </div>
             </div>
 
-            {/* Items List - LARGE FONT */}
             <div className="bg-gray-50 rounded-[2rem] p-6 border-2 border-gray-100 mb-6">
               {order.items?.map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between items-center py-3 border-b border-gray-200 last:border-0">
