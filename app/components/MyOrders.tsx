@@ -27,21 +27,14 @@ export default function MyOrders({ goBack, lang }: any) {
       const querySnapshot = await getDocs(q);
       const fetchedOrders: any[] = [];
       
-      const today = new Date();
-      const datePart = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
-
       querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.orderDateOnly === datePart) {
-           fetchedOrders.push({ id: docSnap.id, ...data });
-        }
+        fetchedOrders.push({ id: docSnap.id, ...docSnap.data() });
       });
-      
       fetchedOrders.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
 
       setOrders(fetchedOrders);
       if (fetchedOrders.length === 0) {
-        setMessage(lang === 'en' ? 'No orders found for today.' : 'අද දින සඳහා ඇණවුම් නොමැත.');
+        setMessage(lang === 'en' ? 'No orders found for this number.' : 'මෙම අංකයට අදාළ ඇණවුම් නොමැත.');
       }
     } catch (error) {
       console.error(error);
