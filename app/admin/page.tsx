@@ -19,22 +19,20 @@ export default function AdminControlCenter() {
       let totalRev = 0;
       let totalProfit = 0;
       
-      snapshot.docs.forEach(doc => {
+snapshot.docs.forEach(doc => {
         const data = doc.data();
         const stat = data.status.toLowerCase();
 
-        // ❌ Cancel වුණු ඕඩර් ලාභයට ගන්නේ නැත
         if (!stat.includes('cancel')) {
           totalRev += data.totalAmount || 0;
           
-          // 💰 මෙතන තමයි වැඩේ තියෙන්නේ:
-          // ඕඩර් එකේ adminProfit කියලා Field එකක් තිබ්බොත් ඒක ගන්නවා.
-          // නැත්නම්, Total Amount එකෙන් 15% ක් ලාභය විදිහට ඔටෝ ගණනය කරනවා.
+          // 💰 දත්ත ගබඩාවේ ඇති ලාභය සෘජුවම ලබා ගැනීම
           if (data.adminProfit !== undefined) {
             totalProfit += data.adminProfit;
-          } else {
-            // ඕඩර් එක දාද්දී ලාභය සේව් වෙලා නැති පරණ ඒවට මෙහෙම හදමු:
-            totalProfit += Math.round((data.totalAmount || 0) * 0.15);
+          }
+          // පැරණි දත්ත තිබේ නම් පමණක් මෙය ක්‍රියාත්මක වේ
+          else {
+            totalProfit += Math.round((data.subTotal || 0) * 0.15);
           }
         }
       });

@@ -66,6 +66,7 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
     setIsProcessing(true);
 
     try {
+// 🛡️ Exact Profit Calculation Logic
       const menuSnap = await getDoc(doc(db, 'settings', 'menu'));
       const menuData = menuSnap.exists() ? menuSnap.data() : {};
       
@@ -74,10 +75,13 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
         const sId = item.id === 'rice' ? 'FRIED-RICE' : item.id.toUpperCase();
         const m = menuData[sId];
         
-        if (m && m.price > 0) {
-          const marginRatio = (m.price - m.cost) / m.price;
-          totalAdminProfit += Math.round(item.price * marginRatio);
+        if (m && m.cost !== undefined) {
+          // සැබෑ ලාභය = (විකුණන මිල) - (වෙන්ඩර්ගේ පිරිවැය * ප්‍රමාණය)
+          // සටහන: item.price යනු දැනටමත් ප්‍රමාණයෙන් (qty) වැඩිවූ මුළු මිලයි.
+          const vendorTotalCost = Number(m.cost) * (item.qty || 1);
+          totalAdminProfit += (Number(item.price) - vendorTotalCost);
         } else {
+          // මිල ගණන් නැති වුවහොත් පමණක් 15% ක් ගනී
           totalAdminProfit += Math.round(item.price * 0.15);
         }
       });
