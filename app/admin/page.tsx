@@ -9,7 +9,7 @@ export default function AdminControlCenter() {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'MENU' | 'REQUESTS'>('DASHBOARD');
   const [stats, setStats] = useState({ orders: 0, revenue: 0, profit: 0 });
 
-  // 📊 Dashboard Summary Logic (අද දවසේ වාර්තා)
+  // 📊 Dashboard Summary Logic (Profit එකත් ගණනය වෙන අලුත් ලොජික් එක)
   useEffect(() => {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -18,12 +18,24 @@ export default function AdminControlCenter() {
     const unsub = onSnapshot(q, (snapshot) => {
       let totalRev = 0;
       let totalProfit = 0;
+      
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        // Cancel වෙච්ච ඒවා ලාභයට ගණන් ගන්නේ නැත
-        if (!data.status.toLowerCase().includes('cancel')) {
+        const stat = data.status.toLowerCase();
+
+        // ❌ Cancel වුණු ඕඩර් ලාභයට ගන්නේ නැත
+        if (!stat.includes('cancel')) {
           totalRev += data.totalAmount || 0;
-          totalProfit += data.adminProfit || 0;
+          
+          // 💰 මෙතන තමයි වැඩේ තියෙන්නේ:
+          // ඕඩර් එකේ adminProfit කියලා Field එකක් තිබ්බොත් ඒක ගන්නවා.
+          // නැත්නම්, Total Amount එකෙන් 15% ක් ලාභය විදිහට ඔටෝ ගණනය කරනවා.
+          if (data.adminProfit !== undefined) {
+            totalProfit += data.adminProfit;
+          } else {
+            // ඕඩර් එක දාද්දී ලාභය සේව් වෙලා නැති පරණ ඒවට මෙහෙම හදමු:
+            totalProfit += Math.round((data.totalAmount || 0) * 0.15);
+          }
         }
       });
       setStats({ orders: snapshot.size, revenue: totalRev, profit: totalProfit });
