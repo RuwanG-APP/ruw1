@@ -27,21 +27,19 @@ export default function VendorLogin() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        // වැදගත්: මෙතනදී "Number" එකක් විදිහටත් චෙක් කරලා බලමු
-        alert("මේ දුරකථන අංකය පද්ධතියේ නැත. Firebase එකේ අංකය String එකක්ද කියා බලන්න.");
+        alert("මෙම දුරකථන අංකය පද්ධතියේ ලියාපදිංචි කර නැත!");
       } else {
         const vendorDoc = querySnapshot.docs[0].data();
         
-        // 2. විස්තර මැච් කරලා බලමු
+        // 1. මුරපදය පරීක්ෂා කිරීම (Consistency: app.nic.slice(-4) තමයි මෙතනට එන්නේ)
         if (vendorDoc.password !== inputPass) {
           alert("මුරපදය වැරදියි!");
-        } else if (vendorDoc.status !== 'APPROVED') {
-          alert(`ඔබ තවම අනුමත වී නැත! (Status: ${vendorDoc.status})`);
         } else {
-          // සියල්ල හරි නම්!
+          // 2. සියල්ල හරි නම්! (Status චෙක් එක අයින් කළා මොකද 'vendors' එකේ ඉන්නෙම Approve අය නිසා)
           localStorage.setItem('vendorPhone', inputPhone);
           window.location.href = '/vendor-dashboard';
         }
+      
       }
     } catch (err) {
       alert("Error: " + err);
