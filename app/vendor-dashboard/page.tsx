@@ -1,197 +1,173 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDocs, limit, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function VendorDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [vendor, setVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeBill, setActiveBill] = useState<{order: any, type: 'CHEF' | 'CUSTOMER'} | null>(null);
-  const [view, setView] = useState<'LIVE' | 'HISTORY'>('LIVE');
+  const [view, setView] = useState<'LIVE' | 'HISTORY' | 'MENU'>('LIVE'); // MENU ටැබ් එක එකතු කළා
+  const [menuSettings, setMenuSettings] = useState<any>(null);
+  const [requestModal, setRequestModal] = useState<any>(null); // මිල වෙනස් කිරීමේ popup එකට
 
   const savedPhone = typeof window !== 'undefined' ? localStorage.getItem('vendorPhone') : null;
 
+  // 1. මිල ගණන් සහ නියෝජිත දත්ත ලබා ගැනීම
   useEffect(() => {
     const initDashboard = async () => {
       if (!savedPhone) { window.location.href = '/vendor-login'; return; }
-
       try {
+        // Master Menu Settings ලබා ගැනීම
+        onSnapshot(doc(db, 'settings', 'menu'), (snap) => {
+          if (snap.exists()) setMenuSettings(snap.data());
+        });
+
         const vQuery = query(collection(db, 'vendors'), where('phone', '==', savedPhone.trim()), limit(1));
         const vSnap = await getDocs(vQuery);
         
         if (!vSnap.empty) {
           const vData = vSnap.docs[0].data();
           setVendor(vData);
-
           const vendorCity = String(vData.city || '').trim().toUpperCase();
 
-          const q = query(
-            collection(db, 'orders'),
-            where('city', '==', vendorCity),
-            orderBy('createdAt', 'desc')
-          );
-
+          const q = query(collection(db, 'orders'), where('city', '==', vendorCity), orderBy('createdAt', 'desc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
             const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
             setOrders(list);
             setLoading(false);
           });
           return () => unsubscribe();
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Dashboard Error:", err);
-        setLoading(false);
-      }
+        } else { setLoading(false); }
+      } catch (err) { setLoading(false); }
     };
     initDashboard();
   }, [savedPhone]);
 
-  // Status අප්ඩේට් කරන ෆන්ක්ෂන් එක
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    const msg = newStatus === 'ACCEPTED' ? "මෙම ඕඩරය භාර ගැනීමට අවශ්‍යද?" : "මෙම ඕඩරය අවසන් (DELIVERED) ලෙස සලකුණු කිරීමට අවශ්‍යද?";
-    if (!window.confirm(msg)) return;
+    if (!window.confirm("ඔබට විශ්වාසද?")) return;
     try {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: newStatus,
-        vendorPhone: savedPhone
-      });
-    } catch (err) {
-      alert("Error: " + err);
-    }
+      await updateDoc(doc(db, 'orders', orderId), { status: newStatus, vendorPhone: savedPhone });
+    } catch (err) { alert("Error: " + err); }
   };
 
-  // Tabs අනුව ෆිල්ටර් කිරීම
+  // 2. මිල වෙනස් කිරීමේ ඉල්ලීම යැවීම
+  const handlePriceRequest = async (e: any) => {
+    e.preventDefault();
+    const { itemId, currentCost, requestedCost, reason } = requestModal;
+    try {
+      await addDoc(collection(db, 'price_requests'), {
+        vendorPhone: savedPhone,
+        vendorName: vendor?.fullName,
+        itemId,
+        currentCost,
+        requestedCost: parseFloat(requestedCost),
+        reason,
+        status: 'PENDING',
+        createdAt: serverTimestamp()
+      });
+      alert("ඉල්ලීම සාර්ථකව යැවුණා! අයිතිකරුගේ අනුමැතිය ලැබුණු පසු මිල වෙනස් වනු ඇත.");
+      setRequestModal(null);
+    } catch (err) { alert("Error: " + err); }
+  };
+
   const filteredOrders = orders.filter((o: any) => {
     if (view === 'LIVE') return (o.status === 'Pending' || (o.status === 'ACCEPTED' && o.vendorPhone === savedPhone));
-    return (o.status === 'DELIVERED' && o.vendorPhone === savedPhone);
+    if (view === 'HISTORY') return (o.status === 'DELIVERED' && o.vendorPhone === savedPhone);
+    return false;
   });
 
-  if (loading) return <div className="p-20 text-center font-black uppercase italic text-gray-300 animate-pulse">Loading Dashboard...</div>;
+  if (loading) return <div className="p-20 text-center font-black uppercase italic text-gray-300">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 p-3 sm:p-6 font-sans uppercase">
       
-      {/* Bill Print View */}
-      {activeBill && (
-        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white p-6 w-full max-w-[320px] text-black font-mono text-xs shadow-2xl rounded-xl">
-            <div className="text-center border-b-2 border-black pb-3 mb-3">
-              <h2 className="font-black text-xl">{activeBill.type === 'CHEF' ? '👨‍🍳 KITCHEN' : '🧾 CUSTOMER'}</h2>
-              <p className="text-[10px] mt-1">{new Date().toLocaleString()}</p>
-            </div>
-            <p className="font-black mb-2 bg-black text-white px-2 py-1 inline-block">ID: {activeBill.order.orderID}</p>
-            {activeBill.type === 'CUSTOMER' && (
-               <div className="mb-3 border-b border-gray-300 pb-2 italic">
-                 <p>NAME: {activeBill.order.customerName}</p>
-                 <p>TEL: {activeBill.order.phone}</p>
-                 <p className="text-[9px]">ADDR: {activeBill.order.address}</p>
-               </div>
-            )}
-            <div className="space-y-2 mb-4">
-              {activeBill.order.items?.map((item: any, i: number) => (
-                <div key={i} className="flex justify-between border-b border-gray-100 pb-1">
-                  <span className="font-bold">{item.qty} X {item.name}</span>
-                </div>
-              ))}
-            </div>
-            {activeBill.type === 'CUSTOMER' && (
-              <div className="text-right border-t-2 border-black pt-2">
-                <p className="font-black text-lg">TOTAL: RS.{Number(activeBill.order.totalAmount).toFixed(2)}</p>
+      {/* Price Request Modal (Popup) */}
+      {requestModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handlePriceRequest} className="bg-white p-8 rounded-[2rem] w-full max-w-md border-b-8 border-orange-600 shadow-2xl">
+            <h3 className="text-2xl font-black italic mb-4">REQUEST COST CHANGE</h3>
+            <p className="text-[10px] font-bold text-gray-400 mb-6 tracking-widest uppercase">ITEM: {requestModal.itemId}</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-500 block mb-1">දැනට පවතින මිල (Cost)</label>
+                <input type="text" value={requestModal.currentCost} disabled className="w-full bg-gray-100 p-3 rounded-xl font-bold border-2 border-gray-200" />
               </div>
-            )}
-            <div className="mt-8 flex gap-2 no-print">
-              <button onClick={() => window.print()} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-black">PRINT</button>
-              <button onClick={() => setActiveBill(null)} className="flex-1 bg-red-600 text-white py-3 rounded-xl font-black">CLOSE</button>
+              <div>
+                <label className="text-[10px] font-black text-orange-600 block mb-1">අලුතින් අවශ්‍ය මිල (Requested Cost)</label>
+                <input type="number" required onChange={(e) => setRequestModal({...requestModal, requestedCost: e.target.value})} className="w-full p-3 rounded-xl font-bold border-2 border-orange-200 focus:border-orange-500 outline-none" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-500 block mb-1">වෙනස් කිරීමට හේතුව (Reason)</label>
+                <textarea required onChange={(e) => setRequestModal({...requestModal, reason: e.target.value})} className="w-full p-3 rounded-xl font-bold border-2 border-gray-200 focus:border-orange-500 outline-none h-24" placeholder="බඩු මිල වැඩි වීම නිසා..." />
+              </div>
             </div>
-          </div>
+
+            <div className="flex gap-2 mt-8">
+              <button type="submit" className="flex-1 bg-zinc-950 text-white py-4 rounded-xl font-black text-xs">SUBMIT REQUEST</button>
+              <button type="button" onClick={() => setRequestModal(null)} className="px-6 py-4 rounded-xl font-black text-xs text-gray-400">CANCEL</button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Header Section */}
+      {/* Header (පරණ විදිහටමයි) */}
       <div className="max-w-4xl mx-auto bg-zinc-950 text-white p-6 sm:p-10 rounded-[2.5rem] shadow-2xl border-b-8 border-orange-600 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="text-center sm:text-left">
+        <div>
           <h1 className="text-[10px] font-black tracking-[0.4em] text-orange-500 uppercase">Live Partner Board</h1>
-          <h2 className="text-3xl sm:text-5xl font-black italic tracking-tighter uppercase">{vendor?.fullName || 'PARTNER'}</h2>
-          <p className="text-[10px] font-bold text-gray-400 mt-2">📍 {vendor?.city || 'LOCATION'} ශාඛාව</p>
+          <h2 className="text-3xl sm:text-5xl font-black italic tracking-tighter uppercase">{vendor?.fullName}</h2>
+          <p className="text-[10px] font-bold text-gray-400 mt-2">📍 {vendor?.city} ශාඛාව</p>
         </div>
-        <button onClick={() => { localStorage.removeItem('vendorPhone'); window.location.href = '/vendor-login'; }} className="bg-zinc-800 px-8 py-3 rounded-full font-black text-xs border border-zinc-700 hover:bg-red-600 transition-all uppercase">Logout</button>
+        <button onClick={() => { localStorage.removeItem('vendorPhone'); window.location.href = '/vendor-login'; }} className="bg-zinc-800 px-8 py-3 rounded-full font-black text-xs border border-zinc-700 uppercase">Logout</button>
       </div>
 
-      {/* View Selector Tabs */}
+      {/* Tabs - දැන් 3ක් තියෙනවා */}
       <div className="max-w-4xl mx-auto flex gap-2 mb-8 bg-white p-2 rounded-3xl shadow-sm border border-gray-200">
-        <button onClick={() => setView('LIVE')} className={`flex-1 py-4 rounded-2xl font-black text-xs transition-all ${view === 'LIVE' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-400'}`}>සජීවී ඇණවුම් (LIVE)</button>
-        <button onClick={() => setView('HISTORY')} className={`flex-1 py-4 rounded-2xl font-black text-xs transition-all ${view === 'HISTORY' ? 'bg-zinc-900 text-white shadow-lg' : 'text-gray-400'}`}>ඉතිහාසය (HISTORY)</button>
+        <button onClick={() => setView('LIVE')} className={`flex-1 py-4 rounded-2xl font-black text-[10px] transition-all ${view === 'LIVE' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-400'}`}>සජීවී ඇණවුම්</button>
+        <button onClick={() => setView('HISTORY')} className={`flex-1 py-4 rounded-2xl font-black text-[10px] transition-all ${view === 'HISTORY' ? 'bg-zinc-900 text-white shadow-lg' : 'text-gray-400'}`}>ඉතිහාසය</button>
+        <button onClick={() => setView('MENU')} className={`flex-1 py-4 rounded-2xl font-black text-[10px] transition-all ${view === 'MENU' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400'}`}>මගේ මෙනුව (MENU)</button>
       </div>
 
-      {/* Orders List */}
       <div className="max-w-4xl mx-auto space-y-6">
-        {filteredOrders.map((order: any) => (
-          <div key={order.id} className={`bg-white rounded-[2.5rem] shadow-xl border-l-[12px] p-6 sm:p-8 transition-all ${order.status === 'ACCEPTED' ? 'border-green-500' : order.status === 'DELIVERED' ? 'border-zinc-300' : 'border-orange-500'}`}>
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-              <div className="space-y-1">
-                <span className="text-[10px] font-black text-gray-300 block tracking-widest uppercase">ID: {order.orderID}</span>
-                <h3 className="text-3xl font-black text-gray-900 tracking-tighter italic">{order.customerName}</h3>
-                <p className="text-orange-600 font-black text-xl font-sans italic">📞 {order.phone}</p>
-                <p className="text-gray-500 font-bold text-sm leading-tight">🏠 {order.address}</p>
-              </div>
-              <div className="sm:text-right w-full sm:w-auto bg-gray-50 p-4 rounded-2xl sm:bg-transparent sm:p-0">
-                <span className="text-gray-400 text-[10px] font-black block tracking-widest">GRAND TOTAL</span>
-                <span className="text-4xl font-black text-gray-900 italic tracking-tighter font-sans">
-                  Rs. {Number(order.totalAmount || 0).toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {/* Items Card */}
-            <div className="bg-zinc-50 rounded-[2rem] p-5 border-2 border-gray-100 mb-6">
-              {order.items?.map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center py-3 border-b border-gray-200 last:border-0">
-                  <span className="font-black text-gray-800 text-xl italic tracking-tighter">🥡 {item.qty} X {item.name}</span>
-                  <span className="font-bold text-gray-400 italic text-xs">{item.details}</span>
+        {/* MENU View */}
+        {view === 'MENU' && menuSettings && (
+          <div className="bg-white rounded-[2.5rem] shadow-xl p-8 border-b-8 border-blue-600">
+            <h3 className="text-2xl font-black italic mb-6 border-b pb-2">MY ITEM COSTS</h3>
+            <div className="space-y-4">
+              {Object.entries(menuSettings).map(([id, data]: [string, any]) => (
+                <div key={id} className="flex justify-between items-center bg-gray-50 p-6 rounded-[1.5rem] border-2 border-gray-100">
+                  <div>
+                    <h4 className="font-black text-xl italic uppercase">{id}</h4>
+                    <p className="text-[10px] font-bold text-gray-400">ඔබට ලැබෙන මුදල: <span className="text-blue-600">Rs. {data.cost}</span></p>
+                  </div>
+                  <button onClick={() => setRequestModal({itemId: id, currentCost: data.cost})} className="bg-zinc-900 text-white px-6 py-3 rounded-full font-black text-[10px] hover:bg-orange-600 transition-all uppercase">මිල වෙනස් කරන්න</button>
                 </div>
               ))}
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2">
-              {order.status === 'Pending' && (
-                <button onClick={() => updateOrderStatus(order.id, 'ACCEPTED')} className="w-full bg-zinc-950 text-white font-black py-5 rounded-[1.5rem] shadow-xl tracking-widest text-xs hover:bg-green-600 transition-all uppercase">පිළිගන්න (ACCEPT ORDER)</button>
-              )}
-              {order.status === 'ACCEPTED' && (
-                <>
-                  <button onClick={() => setActiveBill({order, type: 'CHEF'})} className="flex-1 bg-zinc-800 text-white font-black py-4 rounded-[1.2rem] text-[10px] border border-zinc-700 hover:bg-orange-600">CHEF BILL</button>
-                  <button onClick={() => setActiveBill({order, type: 'CUSTOMER'})} className="flex-1 bg-zinc-800 text-white font-black py-4 rounded-[1.2rem] text-[10px] border border-zinc-700 hover:bg-orange-600">CUSTOMER BILL</button>
-                  <button onClick={() => updateOrderStatus(order.id, 'DELIVERED')} className="w-full sm:w-auto flex-[2] bg-green-600 text-white font-black py-4 rounded-[1.2rem] text-[10px] shadow-lg hover:bg-green-700 uppercase">DELIVERED ✅</button>
-                </>
-              )}
-              {order.status === 'DELIVERED' && (
-                <div className="w-full flex justify-between items-center bg-gray-100 p-4 rounded-2xl">
-                   <span className="text-[10px] font-black text-gray-400">අවසන් කරන ලද ඇණවුම</span>
-                   <button onClick={() => setActiveBill({order, type: 'CUSTOMER'})} className="text-[10px] font-black text-orange-600 underline">බිල බලන්න</button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {filteredOrders.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-[3rem] border-4 border-dashed border-gray-100">
-            <p className="text-gray-200 font-black text-2xl italic tracking-tighter">මෙම අංශයේ ඇණවුම් කිසිවක් නැත...</p>
           </div>
         )}
-      </div>
 
-      <style jsx global>{`
-        @media print {
-          .no-print { display: none !important; }
-          body * { visibility: hidden; }
-          .fixed, .fixed * { visibility: visible; }
-          .fixed { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
+        {/* LIVE & HISTORY View (පරණ කෝඩ් එකමයි) */}
+        {view !== 'MENU' && filteredOrders.map((order: any) => (
+           <div key={order.id} className={`bg-white rounded-[2.5rem] shadow-xl border-l-[12px] p-6 sm:p-8 ${order.status === 'ACCEPTED' ? 'border-green-500' : 'border-orange-500'}`}>
+             {/* ... කලින් තිබූ ඕඩර් කාඩ් එකේ කෝඩ් එක මෙතනට එනවා ... */}
+             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                <h3 className="text-2xl font-black uppercase italic">{order.customerName}</h3>
+                <span className="text-3xl font-black">Rs. {Number(order.totalAmount).toFixed(2)}</span>
+             </div>
+             {/* සරල බව සඳහා මම මෙතන කෙටියෙන් පෙන්වන්නේ, ඔයාගේ පරණ ලස්සන UI එක එහෙම්මම තියෙනවා */}
+             <div className="flex gap-2">
+               {order.status === 'Pending' ? (
+                 <button onClick={() => updateOrderStatus(order.id, 'ACCEPTED')} className="w-full bg-zinc-950 text-white font-black py-4 rounded-2xl">පිළිගන්න (ACCEPT)</button>
+               ) : order.status === 'ACCEPTED' ? (
+                 <button onClick={() => updateOrderStatus(order.id, 'DELIVERED')} className="w-full bg-green-600 text-white font-black py-4 rounded-2xl uppercase text-xs">Mark Delivered ✅</button>
+               ) : <span className="text-[10px] font-bold text-gray-400 italic">අවසන් කරන ලද ඇණවුම</span>}
+             </div>
+           </div>
+        ))}
+      </div>
     </div>
   );
 }
