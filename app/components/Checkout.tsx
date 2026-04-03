@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore'; // getDoc සහ doc එකතු කළා
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 
 export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any) {
   const [formLang, setFormLang] = useState<'si' | 'en'>('si');
@@ -66,22 +66,18 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
     setIsProcessing(true);
 
     try {
-      // 🛡️ Profit Calculation Engine (1000 වතාවක් හිතපු ලොජික් එක)
       const menuSnap = await getDoc(doc(db, 'settings', 'menu'));
       const menuData = menuSnap.exists() ? menuSnap.data() : {};
       
       let totalAdminProfit = 0;
       cartItems.forEach((item: any) => {
-        // ID එක ගළපා ගැනීම (rice -> FRIED-RICE)
         const sId = item.id === 'rice' ? 'FRIED-RICE' : item.id.toUpperCase();
         const m = menuData[sId];
         
         if (m && m.price > 0) {
-          // ලාභ ප්‍රතිශතය බලා ඒ අනුව අයිටම් එකේ ගාණට ලාභය ගණනය කරයි
           const marginRatio = (m.price - m.cost) / m.price;
           totalAdminProfit += Math.round(item.price * marginRatio);
         } else {
-          // දත්ත නැත්නම් 15% ක දළ ලාභයක් ලෙස ගණන් ගනී
           totalAdminProfit += Math.round(item.price * 0.15);
         }
       });
@@ -93,12 +89,15 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
       const datePart = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
       const orderID = `WO-${datePart}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
+      const formattedCity = livingCity.toUpperCase().trim();
+      const finalCity = formattedCity.includes('BRANCH') ? formattedCity : `${formattedCity} BRANCH`;
+
       await addDoc(collection(db, "orders"), {
         orderID,
         customerName: name,
         phone: fullPhone,
         address,
-        city: livingCity.toUpperCase(),
+        city: finalCity,
         area: isCityLimit ? 'City Limit' : 'Out of City',
         paymentMethod: paymentMethod,
         items: cartItems.map((item: any) => ({
@@ -111,7 +110,7 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
         deliveryFee: Number(deliveryFee),
         totalPrice: Number(finalTotal),
         totalAmount: Number(finalTotal),
-        adminProfit: totalAdminProfit, // ✅ දැන් ලාභය සතයටම ඩේටාබේස් එකට යනවා!
+        adminProfit: totalAdminProfit,
         status: "Pending",
         createdAt: serverTimestamp(),
       });
@@ -121,7 +120,7 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
       message += `*Customer Details:*\n`;
       message += `❖ Name: ${name}\n`;
       message += `❖ Phone: ${fullPhone}\n`;
-      message += `❖ City: ${livingCity}\n`;
+      message += `❖ City: ${finalCity}\n`;
       message += `❖ Address: ${address}\n\n`;
       message += `*Order Details:*\n`;
       cartItems.forEach((item: any, idx: number) => {
@@ -162,7 +161,16 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
             <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].phone}</label>
             <div className="flex justify-between gap-1">
               {phoneDigits.map((digit, idx) => (
-                <input key={idx} ref={(el) => (inputRefs.current[idx] = el)} type="text" maxLength={1} value={digit} onChange={(e) => handlePhoneChange(e.target.value, idx)} onKeyDown={(e) => handleKeyDown(e, idx)} className="w-full h-11 border-2 border-gray-200 rounded-xl text-center font-black text-xl focus:border-orange-500 focus:bg-orange-50 outline-none transition-all shadow-sm" />
+                <input 
+                  key={idx} 
+                  ref={(el) => { inputRefs.current[idx] = el; }} 
+                  type="text" 
+                  maxLength={1} 
+                  value={digit} 
+                  onChange={(e) => handlePhoneChange(e.target.value, idx)} 
+                  onKeyDown={(e) => handleKeyDown(e, idx)} 
+                  className="w-full h-11 border-2 border-gray-200 rounded-xl text-center font-black text-xl focus:border-orange-500 focus:bg-orange-50 outline-none transition-all shadow-sm" 
+                />
               ))}
             </div>
           </div>
