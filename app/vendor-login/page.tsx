@@ -16,9 +16,7 @@ export default function VendorLogin() {
       const inputPhone = phone.trim();
       const inputPass = password.trim();
 
-      console.log("Checking for:", inputPhone, inputPass);
-
-      // 1. මුලින්ම බලමු මේ ෆෝන් නම්බර් එක තියෙන කෙනෙක් ඉන්නවද කියලා (Status එක නැතුව)
+      // 1. පද්ධතියේ 'phone' එක තියෙනවද කියා බැලීම (Data Consistency: 'phone' field එක පාවිච්චි කරයි)
       const q = query(
         collection(db, 'vendors'),
         where('phone', '==', inputPhone)
@@ -31,15 +29,14 @@ export default function VendorLogin() {
       } else {
         const vendorDoc = querySnapshot.docs[0].data();
         
-        // 1. මුරපදය පරීක්ෂා කිරීම (Consistency: app.nic.slice(-4) තමයි මෙතනට එන්නේ)
+        // 2. මුරපදය පරීක්ෂා කිරීම (NIC අග අකුරු 4)
         if (vendorDoc.password !== inputPass) {
           alert("මුරපදය වැරදියි!");
         } else {
-          // 2. සියල්ල හරි නම්! (Status චෙක් එක අයින් කළා මොකද 'vendors' එකේ ඉන්නෙම Approve අය නිසා)
+          // 3. සියල්ල හරි නම් කෙලින්ම Dashboard එකට!
           localStorage.setItem('vendorPhone', inputPhone);
           window.location.href = '/vendor-dashboard';
         }
-      
       }
     } catch (err) {
       alert("Error: " + err);
