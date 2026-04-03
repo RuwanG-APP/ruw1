@@ -151,12 +151,18 @@ export default function VendorDashboard() {
               </div>
             </div>
 
+           {/* Financial Summary */}
             {activeBill.type === 'CUSTOMER' && (
-              <div className="mb-6 space-y-1 bg-zinc-50 p-4 rounded-2xl border-l-4 border-orange-500">
-                <h4 className="text-[9px] font-black text-gray-400 mb-2 tracking-widest uppercase">Delivery Details</h4>
-                <p className="text-sm font-black italic uppercase leading-none">{activeBill.order.customerName}</p>
-                <p className="text-xs font-bold tracking-tighter font-sans">📞 {activeBill.order.phone}</p>
-                <p className="text-[10px] font-medium leading-tight text-gray-600 normal-case italic mt-1 font-sans">🏠 {activeBill.order.address}</p>
+              <div className="text-right border-t-2 border-black pt-4">
+                
+                {/* 🚚 අලුතින් එකතු කළ Delivery Charge පේළිය */}
+                <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
+                  <span className="text-[10px] font-black text-gray-500 uppercase">Delivery Charge</span>
+                  <span className="font-black text-sm italic">Rs. {Number(activeBill.order.deliveryFee || 0).toFixed(2)}</span>
+                </div>
+                
+                <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Bill Amount</p>
+                <p className="text-3xl font-black italic tracking-tighter leading-none font-sans">RS. {Number(activeBill.order.totalAmount).toFixed(2)}</p>
               </div>
             )}
 
