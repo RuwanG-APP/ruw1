@@ -86,7 +86,7 @@ export default function MyOrders({ goBack, lang }: any) {
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[80vh] overflow-y-auto">
         <button onClick={goBack} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 font-bold text-xl">✕</button>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 italic tracking-tight">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 italic tracking-tight uppercase">
           {lang === 'en' ? 'MY ORDERS' : 'මගේ ඇණවුම්'}
         </h2>
         
@@ -98,7 +98,7 @@ export default function MyOrders({ goBack, lang }: any) {
              placeholder={lang === 'en' ? 'Enter Phone Number' : 'දුරකථන අංකය ඇතුලත් කරන්න'}
              className="flex-1 border-2 border-gray-600 rounded-xl p-2.5 focus:border-orange-500 focus:outline-none" 
            />
-           <button onClick={fetchOrders} className="bg-zinc-900 text-white px-4 rounded-xl font-bold hover:bg-orange-600 transition-colors">
+           <button onClick={fetchOrders} className="bg-zinc-900 text-white px-4 rounded-xl font-bold hover:bg-orange-600 transition-colors uppercase">
              {loading ? '...' : (lang === 'en' ? 'Search' : 'සොයන්න')}
            </button>
         </div>
@@ -114,7 +114,10 @@ export default function MyOrders({ goBack, lang }: any) {
         <div className="space-y-4">
           {orders.map((o, i) => {
             const isCancelled = o.status.toLowerCase().includes('cancel');
-            const isHandovered = o.status.toLowerCase().includes('handover');
+            const isDelivered = o.status.toLowerCase().includes('deliver');
+            const isAccepted = o.status.toLowerCase().includes('accept');
+            
+            // Check if it's past 2:00 PM (14:00)
             const isPast2PM = new Date().getHours() >= 14;
             
             const oPaid = Number(o.totalAmount || 0);
@@ -122,31 +125,32 @@ export default function MyOrders({ goBack, lang }: any) {
             const showRefund = oWallet + Math.round(oPaid * 0.85);
 
             return (
-            <div key={i} className="border-2 border-gray-200 p-4 rounded-xl">
+            <div key={i} className={`border-2 p-4 rounded-xl ${isPast2PM && !isCancelled && !isDelivered ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'}`}>
                <div className="flex justify-between items-center mb-2 border-b pb-2">
                  <span className="font-mono text-xs font-bold text-zinc-500">{o.orderID}</span>
-                 <span className={`text-xs font-black px-2 py-1 rounded ${isCancelled ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
+                 <span className={`text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest ${isCancelled ? 'bg-red-100 text-red-600' : 'bg-zinc-900 text-white'}`}>{o.status}</span>
                </div>
-               <div className="text-sm font-bold text-gray-800 mb-1">
+               <div className="text-sm font-bold text-gray-800 mb-1 uppercase">
                  {lang === 'en' ? 'Paid Amount: Rs.' : 'ගෙවූ මුදල: රු.'} {o.totalAmount}.00
                </div>
                {o.walletUsed > 0 && (
-                 <div className="text-xs font-bold text-green-600 mb-2">
+                 <div className="text-xs font-bold text-green-600 mb-2 uppercase">
                    Wallet Used: Rs. {o.walletUsed}.00
                  </div>
                )}
                
-               {(isCancelled || isHandovered) ? (
-                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed mt-2">
-                   {lang === 'en' ? 'Not Eligible for Cancellation' : 'මෙය අවලංගු කළ නොහැක'}
-                 </button>
-               ) : isPast2PM ? (
-                 <button disabled className="w-full bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-sm cursor-not-allowed mt-2">
-                   {lang === 'en' ? 'Cancellation time (2 PM) has passed' : 'ප.ව 2:00 පසු වී ඇති බැවින් අවලංගු කළ නොහැක'}
-                 </button>
+               {/* Cancellation Logic Area */}
+               {(isCancelled || isDelivered) ? (
+                 <div className="w-full text-center bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-xs uppercase tracking-widest mt-2">
+                   {isCancelled ? (lang === 'en' ? 'Cancelled' : 'අවලංගු කර ඇත') : (lang === 'en' ? 'Completed' : 'අවසන් කර ඇත')}
+                 </div>
+               ) : isPast2PM || isAccepted ? (
+                 <div className="w-full text-center bg-orange-100 text-orange-600 border border-orange-200 py-2 rounded-lg font-black text-xs uppercase tracking-widest mt-2 flex items-center justify-center gap-2">
+                   👨‍🍳 {lang === 'en' ? 'Preparing (Cannot Cancel)' : 'සකස් කරමින් පවතී (අවලංගු කළ නොහැක)'}
+                 </div>
                ) : (
-                 <button onClick={() => handleCancel(o)} className="w-full bg-red-100 text-red-600 border border-red-200 py-2 rounded-lg font-bold text-sm hover:bg-red-600 hover:text-white transition-colors mt-2">
-                   {lang === 'en' ? `Cancel Order & Get Rs.${showRefund} Refund` : `ඇණවුම අවලංගු කර රු.${showRefund} ක් ලබාගන්න`}
+                 <button onClick={() => handleCancel(o)} className="w-full bg-zinc-900 text-white border-b-4 border-red-600 py-3 rounded-lg font-black text-xs hover:bg-red-600 hover:border-red-800 transition-all uppercase tracking-widest mt-2">
+                   {lang === 'en' ? `Cancel & Get Rs.${showRefund} Refund` : `අවලංගු කර රු.${showRefund} ක් ලබාගන්න`}
                  </button>
                )}
             </div>
