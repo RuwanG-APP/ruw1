@@ -98,12 +98,16 @@ successMsg: lang === 'en' ? 'Your application has been successfully submitted. O
     }
 
     const finalNIC = formData.nicFormat === 'old' ? `${formData.nicNumber}${formData.nicLetter}` : formData.nicNumber;
+    
+    // --- අපේ ඇප් එකේ Standard Date Format එක සෑදීම (Consistency) ---
+    const today = new Date();
+    const datePart = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
 
     setIsSubmitting(true);
 
     try {
-      // 1. ඩුප්ලිකේට් පරීක්ෂාව (Phone & NIC)
-      const qPhone = query(collection(db, 'vendor_applications'), where("mobilePhone", "==", formData.mobilePhone));
+      // 1. ඩුප්ලිකේට් පරීක්ෂාව (අලුත් field name එක 'phone' ලෙස භාවිතා කර ඇත)
+      const qPhone = query(collection(db, 'vendor_applications'), where("phone", "==", formData.mobilePhone));
       const qNic = query(collection(db, 'vendor_applications'), where("nic", "==", finalNIC));
 
       const [snapPhone, snapNic] = await Promise.all([getDocs(qPhone), getDocs(qNic)]);
@@ -120,10 +124,10 @@ successMsg: lang === 'en' ? 'Your application has been successfully submitted. O
         return;
       }
 
-      // 2. සියල්ල හරි නම් පමණක් සේව් කිරීම
+      // 2. සියල්ල හරි නම් Firebase එකට සේව් කිරීම
       await addDoc(collection(db, 'vendor_applications'), {
         fullName: formData.fullName,
-        mobilePhone: formData.mobilePhone,
+        phone: formData.mobilePhone, // මෙතන 'phone' ලෙස වෙනස් කළා (Consistency)
         landPhone: formData.landPhone,
         email: formData.email,
         nic: finalNIC,
@@ -135,6 +139,7 @@ successMsg: lang === 'en' ? 'Your application has been successfully submitted. O
         appliedLang: lang,
         status: 'Pending', 
         appliedAt: serverTimestamp(),
+        appliedDateOnly: datePart // අලුතින් එකතු කළා (Filtering සඳහා)
       });
       
       setIsSuccess(true);
@@ -144,7 +149,6 @@ successMsg: lang === 'en' ? 'Your application has been successfully submitted. O
       setIsSubmitting(false);
     }
   };
-
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
