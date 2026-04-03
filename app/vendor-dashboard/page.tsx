@@ -28,12 +28,24 @@ export default function VendorDashboard() {
         if (!vSnap.empty) {
           const vData = vSnap.docs[0].data();
           setVendor(vData);
-          const vendorCity = String(vData.city || '').trim().toUpperCase();
+          
+          // 🛡️ SMART CITY MATCHING: නමේ මුල් කෑල්ල විතරක් අරන් චෙක් කරමු
+          const vendorCityFull = String(vData.city || '').trim().toUpperCase();
+          const vendorBaseName = vendorCityFull.replace(' BRANCH', '').trim();
 
-          const q = query(collection(db, 'orders'), where('city', '==', vendorCity), orderBy('createdAt', 'desc'));
+          // මුලින්ම අද දවසේ සියලු ඕඩර්ස් ගමු (පස්සේ ෆිල්ටර් කරමු)
+          const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
+          
           const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            setOrders(list);
+            const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as any));
+            
+            // 🏙️ මෙතනදී මාලන් බ්‍රැන්ඩෝට අදාළ නගරය බුද්ධිමත්ව ෆිල්ටර් කරනවා
+            const filteredList = list.filter(order => {
+                const orderCity = String(order.city || '').toUpperCase();
+                return orderCity.includes(vendorBaseName); // KANDY SOUTH කියන කෑල්ල තිබ්බොත් ඇති!
+            });
+
+            setOrders(filteredList);
             setLoading(false);
           });
           return () => unsubscribe();
@@ -71,11 +83,20 @@ export default function VendorDashboard() {
     } catch (err) { alert("Error: " + err); }
   };
 
+  // 💰 සතයටම නිවැරදි ලාභය පෙන්වන අප්ඩේට් එක
   const calculateFinancials = (order: any) => {
-    let totalVendorCost = 0;
     const sellingPrice = Number(order.totalAmount || 0);
     const deliveryFee = Number(order.deliveryFee || 0);
 
+    // 🛡️ ඩේටාබේස් එකේ adminProfit තියෙනවා නම් ඒකෙන්ම ලාභය සහ කොස්ට් එක ගනිමු
+    if (order.adminProfit !== undefined) {
+        const profit = Number(order.adminProfit);
+        const vendorCost = sellingPrice - deliveryFee - profit;
+        return { sellingPrice, vendorCost, profit, deliveryFee };
+    }
+
+    // පැරණි ඕඩර් සඳහා පමණක් මෙය ක්‍රියාත්මක වේ
+    let totalVendorCost = 0;
     order.items?.forEach((item: any) => {
       const itemKey = item.id || (typeof item.name === 'string' ? item.name.toLowerCase().replace(" ", "-") : '');
       const setting = menuSettings?.[itemKey];
@@ -101,17 +122,15 @@ export default function VendorDashboard() {
   return (
     <div className="min-h-screen bg-gray-100 p-3 sm:p-6 font-sans uppercase overflow-x-hidden">
       
-      {/* 🧾 Price Request Modal */}
       {requestModal && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <form onSubmit={handlePriceRequest} className="bg-white p-8 rounded-[2.5rem] w-full max-w-md border-b-8 border-blue-600 shadow-2xl relative animate-in fade-in zoom-in duration-200">
             <button type="button" onClick={() => setRequestModal(null)} className="absolute top-6 right-6 font-black text-gray-400">✕</button>
             <h3 className="text-2xl font-black italic mb-2 tracking-tighter uppercase">Request Price Change</h3>
             <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest italic border-b pb-2">Item: {requestModal.itemId}</p>
-            
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-gray-500 block mb-1">දැනට පවතින මිල (Current Share)</label>
+                <label className="text-[10px] font-black text-gray-500 block mb-1 uppercase">Current Share</label>
                 <input type="text" value={`Rs. ${requestModal.currentCost}`} disabled className="w-full bg-gray-50 p-4 rounded-2xl font-black border-2 border-gray-100 text-gray-400" />
               </div>
               <div>
@@ -123,13 +142,11 @@ export default function VendorDashboard() {
                 <textarea required onChange={(e) => setRequestModal({...requestModal, reason: e.target.value})} className="w-full p-4 rounded-2xl font-bold border-2 border-gray-100 focus:border-blue-500 outline-none h-28 text-sm normal-case" placeholder="උදා: බඩු මිල වැඩිවීම නිසා..." />
               </div>
             </div>
-
             <button type="submit" className="w-full mt-8 bg-zinc-950 text-white py-5 rounded-2xl font-black text-xs tracking-[0.2em] shadow-lg hover:bg-blue-600 transition-all uppercase italic">Submit Request</button>
           </form>
         </div>
       )}
 
-      {/* 🧾 Bill Modal (Fix Applied Here!) */}
       {activeBill && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 w-full max-w-[360px] text-black font-mono shadow-2xl rounded-3xl border-t-8 border-black animate-in fade-in zoom-in duration-200">
@@ -137,12 +154,12 @@ export default function VendorDashboard() {
               <h2 className="font-black text-2xl italic tracking-tighter uppercase leading-none">
                 {activeBill.type === 'CHEF' ? '👨‍🍳 KITCHEN ORDER' : '🧾 CUSTOMER BILL'}
               </h2>
-              <p className="text-[10px] font-bold text-gray-500 mt-2 uppercase tracking-widest italic">Week Out - {vendor?.city} Branch</p>
+              <p className="text-[10px] font-bold text-gray-500 mt-2 uppercase tracking-widest italic">Week Out - {vendor?.city}</p>
             </div>
 
             <div className="space-y-2 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-              <div className="flex justify-between">
-                <span className="text-[9px] font-black text-gray-400 uppercase">Order ID:</span>
+              <div className="flex justify-between uppercase">
+                <span className="text-[9px] font-black text-gray-400">Order ID:</span>
                 <span className="text-[9px] font-black">{activeBill.order.orderID}</span>
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-2">
@@ -151,7 +168,6 @@ export default function VendorDashboard() {
               </div>
             </div>
 
-            {/* Delivery Details */}
             {activeBill.type === 'CUSTOMER' && (
               <div className="mb-6 space-y-1 bg-zinc-50 p-4 rounded-2xl border-l-4 border-orange-500">
                 <h4 className="text-[9px] font-black text-gray-400 mb-2 tracking-widest uppercase">Delivery Details</h4>
@@ -161,7 +177,6 @@ export default function VendorDashboard() {
               </div>
             )}
 
-            {/* Items Ordered List */}
             <div className="space-y-4 mb-6">
               <h4 className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Items Ordered</h4>
               {activeBill.order.items?.map((item: any, i: number) => {
@@ -178,17 +193,14 @@ export default function VendorDashboard() {
               })}
             </div>
 
-            {/* Financial Summary with Delivery Charge */}
             {activeBill.type === 'CUSTOMER' && (
               <div className="text-right border-t-2 border-black pt-4">
-                
                 <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
                   <span className="text-[10px] font-black text-gray-500 uppercase">Delivery Charge</span>
                   <span className="font-black text-sm italic">Rs. {Number(activeBill.order.deliveryFee || 0).toFixed(2)}</span>
                 </div>
-                
                 <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Bill Amount</p>
-                <p className="text-3xl font-black italic tracking-tighter leading-none font-sans">RS. {Number(activeBill.order.totalAmount).toFixed(2)}</p>
+                <p className="text-3xl font-black italic tracking-tighter leading-none font-sans uppercase">RS. {Number(activeBill.order.totalAmount).toFixed(2)}</p>
               </div>
             )}
 
@@ -200,19 +212,15 @@ export default function VendorDashboard() {
         </div>
       )}
 
-      {/* --- DASHBOARD UI --- */}
-      
-      {/* Header */}
       <div className="max-w-6xl mx-auto bg-zinc-950 text-white p-6 sm:p-10 rounded-[2.5rem] shadow-2xl border-b-8 border-orange-600 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="text-center sm:text-left">
           <h1 className="text-[10px] font-black tracking-[0.4em] text-orange-500 mb-1 uppercase italic">Live Partner Board</h1>
           <h2 className="text-3xl sm:text-5xl font-black italic tracking-tighter uppercase leading-none">{vendor?.fullName}</h2>
-          <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest italic">📍 {vendor?.city} BRANCH</p>
+          <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest italic">📍 {vendor?.city}</p>
         </div>
         <button onClick={() => { localStorage.removeItem('vendorPhone'); window.location.href = '/vendor-login'; }} className="bg-zinc-800 px-8 py-3 rounded-full font-black text-xs border border-zinc-700 uppercase italic hover:bg-red-600 transition-all">Logout</button>
       </div>
 
-      {/* Tabs */}
       <div className="max-w-6xl mx-auto flex gap-2 mb-8 bg-white p-2 rounded-full shadow-sm border border-gray-200">
         <button onClick={() => setView('LIVE')} className={`flex-1 py-4 rounded-full font-black text-[10px] transition-all uppercase italic ${view === 'LIVE' ? 'bg-orange-600 text-white shadow-lg' : 'text-gray-400'}`}>සජීවී ඇණවුම්</button>
         <button onClick={() => setView('HISTORY')} className={`flex-1 py-4 rounded-full font-black text-[10px] transition-all uppercase italic ${view === 'HISTORY' ? 'bg-zinc-900 text-white shadow-lg' : 'text-gray-400'}`}>ඉතිහාසය (HISTORY)</button>
@@ -220,10 +228,8 @@ export default function VendorDashboard() {
       </div>
 
       <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* HISTORY View */}
         {view === 'HISTORY' && (
-          <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border-2 border-black">
+          <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border-2 border-black animate-in fade-in duration-500">
             <div className="bg-black text-white p-6 flex justify-between items-center">
               <h3 className="text-xl font-black italic uppercase tracking-tighter">Settlement Log</h3>
               <span className="text-[8px] font-black bg-orange-600 px-3 py-1 rounded-full italic tracking-widest">TRANSPARENCY MODE</span>
@@ -272,19 +278,18 @@ export default function VendorDashboard() {
           </div>
         )}
 
-        {/* LIVE VIEW */}
         {view === 'LIVE' && filteredOrders.map((order: any) => (
-          <div key={order.id} className={`bg-white rounded-[2.5rem] shadow-xl border-l-[12px] p-6 sm:p-8 ${order.status === 'ACCEPTED' ? 'border-green-500' : 'border-orange-500'}`}>
+          <div key={order.id} className={`bg-white rounded-[2.5rem] shadow-xl border-l-[12px] p-6 sm:p-8 animate-in slide-in-from-right duration-300 ${order.status === 'ACCEPTED' ? 'border-green-500' : 'border-orange-500'}`}>
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 uppercase italic">
               <div className="space-y-1">
-                <span className="text-[10px] font-black text-gray-300 block tracking-widest uppercase font-sans tracking-widest">ID: {order.orderID}</span>
+                <span className="text-[10px] font-black text-gray-300 block tracking-widest uppercase font-sans">ID: {order.orderID}</span>
                 <h3 className="text-3xl font-black text-gray-900 tracking-tighter italic uppercase leading-none">{order.customerName}</h3>
-                <p className="text-orange-600 font-black text-xl italic font-sans italic tracking-tighter mt-1">📞 {order.phone}</p>
-                <p className="text-[10px] font-bold text-gray-400 mt-2 normal-case leading-tight">🏠 {order.address}</p>
+                <p className="text-orange-600 font-black text-xl italic font-sans tracking-tighter mt-1">📞 {order.phone}</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-2 normal-case leading-tight uppercase">🏠 {order.address}</p>
               </div>
               <div className="sm:text-right w-full sm:w-auto bg-zinc-50 p-4 rounded-[1.5rem] sm:bg-transparent sm:p-0">
                 <span className="text-gray-400 text-[10px] font-black block tracking-widest uppercase font-sans">Amount Due</span>
-                <span className="text-4xl font-black text-gray-900 italic tracking-tighter font-sans leading-none">Rs. {Number(order.totalAmount || 0).toFixed(2)}</span>
+                <span className="text-4xl font-black text-gray-900 italic tracking-tighter font-sans leading-none uppercase">Rs. {Number(order.totalAmount || 0).toFixed(2)}</span>
               </div>
             </div>
 
@@ -315,9 +320,8 @@ export default function VendorDashboard() {
           </div>
         ))}
 
-        {/* MENU VIEW */}
         {view === 'MENU' && menuSettings && (
-           <div className="bg-white rounded-[2.5rem] shadow-xl p-8 border-b-8 border-blue-600 uppercase italic tracking-tighter">
+           <div className="bg-white rounded-[2.5rem] shadow-xl p-8 border-b-8 border-blue-600 uppercase italic tracking-tighter animate-in zoom-in duration-300">
               <h3 className="text-2xl font-black italic mb-8 border-b-2 border-gray-100 pb-2 uppercase">My Items Pricing</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.entries(menuSettings).map(([id, data]: [string, any]) => (
