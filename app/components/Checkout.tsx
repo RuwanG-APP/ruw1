@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore'; // getDoc සහ doc එකතු කළා
 
 export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any) {
   const [formLang, setFormLang] = useState<'si' | 'en'>('si');
@@ -13,7 +13,6 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
   const [paymentMethod, setPaymentMethod] = useState<'Online' | 'COD'>('Online');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // දුරකථන අංකය කොටු 10 ලොජික් එක
   const [phoneDigits, setPhoneDigits] = useState(['', '', '', '', '', '', '', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -67,14 +66,33 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
     setIsProcessing(true);
 
     try {
+      // 🛡️ Profit Calculation Engine (1000 වතාවක් හිතපු ලොජික් එක)
+      const menuSnap = await getDoc(doc(db, 'settings', 'menu'));
+      const menuData = menuSnap.exists() ? menuSnap.data() : {};
+      
+      let totalAdminProfit = 0;
+      cartItems.forEach((item: any) => {
+        // ID එක ගළපා ගැනීම (rice -> FRIED-RICE)
+        const sId = item.id === 'rice' ? 'FRIED-RICE' : item.id.toUpperCase();
+        const m = menuData[sId];
+        
+        if (m && m.price > 0) {
+          // ලාභ ප්‍රතිශතය බලා ඒ අනුව අයිටම් එකේ ගාණට ලාභය ගණනය කරයි
+          const marginRatio = (m.price - m.cost) / m.price;
+          totalAdminProfit += Math.round(item.price * marginRatio);
+        } else {
+          // දත්ත නැත්නම් 15% ක දළ ලාභයක් ලෙස ගණන් ගනී
+          totalAdminProfit += Math.round(item.price * 0.15);
+        }
+      });
+
       const now = new Date();
-      const dateStr = now.toLocaleDateString('en-GB'); // DD/MM/YYYY
+      const dateStr = now.toLocaleDateString('en-GB'); 
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
       
       const datePart = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
       const orderID = `WO-${datePart}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
-      // 🛡️ FIX: ඩේටාබේස් එකට යන දත්ත වලට මගහැරුණු deliveryFee, subTotal සහ items නැවත එකතු කිරීම
       await addDoc(collection(db, "orders"), {
         orderID,
         customerName: name,
@@ -92,31 +110,27 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
         subTotal: Number(subTotal),
         deliveryFee: Number(deliveryFee),
         totalPrice: Number(finalTotal),
-        totalAmount: Number(finalTotal), // රිපෝට් එකට සහය වීමට
+        totalAmount: Number(finalTotal),
+        adminProfit: totalAdminProfit, // ✅ දැන් ලාභය සතයටම ඩේටාබේස් එකට යනවා!
         status: "Pending",
         createdAt: serverTimestamp(),
       });
 
-      // 2. WhatsApp මැසේජ් එක සැකසීම
       let message = `❖ *NEW ORDER: ${orderID}* ❖\n`;
       message += `◆ Date: ${dateStr} | ◆ Time: ${timeStr}\n\n`;
-      
       message += `*Customer Details:*\n`;
       message += `❖ Name: ${name}\n`;
       message += `❖ Phone: ${fullPhone}\n`;
       message += `❖ City: ${livingCity}\n`;
       message += `❖ Address: ${address}\n\n`;
-      
       message += `*Order Details:*\n`;
       cartItems.forEach((item: any, idx: number) => {
-        message += `${idx + 1}. ${item.qty || 1} x ${item.name.en || item.name} - Rs.${item.price * (item.qty || 1)}\n`;
+        message += `${idx + 1}. ${item.qty || 1} x ${item.name.en || item.name} - Rs.${item.price}\n`;
       });
-
       message += `\n*Billing:*\n`;
       message += `Subtotal: Rs.${subTotal}\n`;
       message += `Delivery Fee: Rs.${deliveryFee}\n`;
       message += `*Total to Pay: Rs.${finalTotal}.00*\n\n`;
-
       message += `*(Note: ${paymentMethod === 'Online' ? 'Online Payment Selected - Send Payment Link' : 'Cash on Delivery Selected'})*`;
 
       clearCart();
@@ -131,7 +145,6 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md font-sans">
       <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg border-t-8 border-orange-500 relative max-h-[95vh] overflow-y-auto">
-        
         <div className="flex justify-between items-center mb-4">
           <button onClick={goBack} className="text-gray-400 font-bold text-xl">✕</button>
           <div className="flex gap-2">
@@ -139,17 +152,12 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
             <button onClick={() => setFormLang('en')} className={`px-3 py-1 rounded-full text-[10px] font-black ${formLang === 'en' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-400'}`}>EN</button>
           </div>
         </div>
-
-        <h2 className="text-2xl font-black text-gray-900 mb-6 text-center uppercase italic tracking-tighter leading-none">
-          {t[formLang].title}
-        </h2>
-        
+        <h2 className="text-2xl font-black text-gray-900 mb-6 text-center uppercase italic tracking-tighter leading-none">{t[formLang].title}</h2>
         <form className="space-y-4">
           <div>
             <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].name}</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full border-2 border-gray-100 bg-gray-50 rounded-2xl p-3 font-bold focus:border-orange-500 outline-none" />
           </div>
-
           <div>
             <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].phone}</label>
             <div className="flex justify-between gap-1">
@@ -158,7 +166,6 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
               ))}
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].city}</label>
@@ -172,12 +179,10 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
               </div>
             </div>
           </div>
-
           <div>
             <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].address}</label>
             <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full border-2 border-gray-100 bg-gray-50 rounded-2xl p-3 font-bold focus:border-orange-500 outline-none" rows={2}></textarea>
           </div>
-
           <div>
             <label className="text-[10px] font-black text-orange-600 ml-2 uppercase tracking-widest">{t[formLang].payMethod}</label>
             <div className="flex gap-3">
@@ -186,13 +191,11 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
             </div>
           </div>
         </form>
-
         <div className="mt-6 bg-zinc-900 p-6 rounded-[2rem] text-white shadow-xl">
           <div className="flex justify-between text-[10px] font-black text-zinc-500 uppercase"><span>Subtotal:</span><span>Rs. {subTotal}.00</span></div>
           <div className="flex justify-between text-[10px] font-black text-zinc-500 uppercase pb-2 border-b border-zinc-800"><span>Delivery:</span><span>Rs. {deliveryFee}.00</span></div>
           <div className="flex justify-between text-2xl font-black italic pt-2 tracking-tighter"><span>{t[formLang].tot}:</span><span className="text-orange-500 not-italic font-sans">Rs. {finalTotal}.00</span></div>
         </div>
-
         <button onClick={handleConfirmOrder} disabled={isProcessing} className="w-full mt-6 bg-orange-600 text-white font-black py-5 rounded-[2rem] shadow-xl hover:bg-zinc-900 transition-all uppercase tracking-[0.2em] text-xs">
           {isProcessing ? 'Processing...' : t[formLang].btn}
         </button>
