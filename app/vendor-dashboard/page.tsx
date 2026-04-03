@@ -50,6 +50,27 @@ export default function VendorDashboard() {
     } catch (err) { alert("Error: " + err); }
   };
 
+  const handlePriceRequest = async (e: any) => {
+    e.preventDefault();
+    const { itemId, currentCost, requestedCost, reason } = requestModal;
+    if (!requestedCost || !reason) { alert("කරුණාකර සියලු විස්තර පුරවන්න."); return; }
+    
+    try {
+      await addDoc(collection(db, 'price_requests'), {
+        vendorPhone: savedPhone,
+        vendorName: vendor?.fullName,
+        itemId,
+        currentCost,
+        requestedCost: parseFloat(requestedCost),
+        reason,
+        status: 'PENDING',
+        createdAt: serverTimestamp()
+      });
+      alert("මිල වෙනස් කිරීමේ ඉල්ලීම අයිතිකරු වෙත යැවුණා!");
+      setRequestModal(null);
+    } catch (err) { alert("Error: " + err); }
+  };
+
   const calculateFinancials = (order: any) => {
     let totalVendorCost = 0;
     const sellingPrice = Number(order.totalAmount || 0);
@@ -75,16 +96,43 @@ export default function VendorDashboard() {
     return false;
   });
 
-  if (loading) return <div className="p-20 text-center font-black italic text-gray-300 animate-pulse uppercase tracking-[0.3em]">Restoring Track...</div>;
+  if (loading) return <div className="p-20 text-center font-black italic text-gray-300 animate-pulse uppercase tracking-[0.3em]">Loading Data...</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 p-3 sm:p-6 font-sans uppercase overflow-x-hidden">
       
-      {/* 🧾 RESTORED: Full Professional Bill Modal */}
+      {/* Price Request Modal */}
+      {requestModal && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <form onSubmit={handlePriceRequest} className="bg-white p-8 rounded-[2.5rem] w-full max-w-md border-b-8 border-blue-600 shadow-2xl relative">
+            <button type="button" onClick={() => setRequestModal(null)} className="absolute top-6 right-6 font-black text-gray-400">✕</button>
+            <h3 className="text-2xl font-black italic mb-2 tracking-tighter uppercase">Request Price Change</h3>
+            <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest italic border-b pb-2">Item: {requestModal.itemId}</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-500 block mb-1">දැනට පවතින මිල (Current Share)</label>
+                <input type="text" value={`Rs. ${requestModal.currentCost}`} disabled className="w-full bg-gray-50 p-4 rounded-2xl font-black border-2 border-gray-100 text-gray-400" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-blue-600 block mb-1 uppercase tracking-widest">New Requested Price</label>
+                <input type="number" required onChange={(e) => setRequestModal({...requestModal, requestedCost: e.target.value})} className="w-full p-4 rounded-2xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none shadow-sm" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-500 block mb-1 uppercase tracking-widest">Reason for Change</label>
+                <textarea required onChange={(e) => setRequestModal({...requestModal, reason: e.target.value})} className="w-full p-4 rounded-2xl font-bold border-2 border-gray-100 focus:border-blue-500 outline-none h-28 text-sm normal-case" placeholder="උදා: බඩු මිල වැඩිවීම නිසා..." />
+              </div>
+            </div>
+
+            <button type="submit" className="w-full mt-8 bg-zinc-950 text-white py-5 rounded-2xl font-black text-xs tracking-[0.2em] shadow-lg hover:bg-blue-600 transition-all uppercase italic">Submit Request</button>
+          </form>
+        </div>
+      )}
+
+      {/* Bill Modal */}
       {activeBill && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 w-full max-w-[360px] text-black font-mono shadow-2xl rounded-3xl border-t-8 border-black animate-in fade-in zoom-in duration-200">
-            
             <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
               <h2 className="font-black text-2xl italic tracking-tighter uppercase leading-none">
                 {activeBill.type === 'CHEF' ? '👨‍🍳 KITCHEN ORDER' : '🧾 CUSTOMER BILL'}
@@ -103,7 +151,6 @@ export default function VendorDashboard() {
               </div>
             </div>
 
-            {/* Customer Information Section */}
             {activeBill.type === 'CUSTOMER' && (
               <div className="mb-6 space-y-1 bg-zinc-50 p-4 rounded-2xl border-l-4 border-orange-500">
                 <h4 className="text-[9px] font-black text-gray-400 mb-2 tracking-widest uppercase">Delivery Details</h4>
@@ -113,11 +160,9 @@ export default function VendorDashboard() {
               </div>
             )}
 
-            {/* Items List Section */}
             <div className="space-y-4 mb-6">
               <h4 className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Items Ordered</h4>
               {activeBill.order.items?.map((item: any, i: number) => {
-                // Clean the item name from double quantity strings
                 const cleanName = (typeof item.name === 'string') ? item.name.replace(/^\d+ x /i, '') : item.name;
                 return (
                   <div key={i} className="flex justify-between items-start border-b border-gray-100 pb-2">
@@ -131,7 +176,6 @@ export default function VendorDashboard() {
               })}
             </div>
 
-            {/* Financial Summary */}
             {activeBill.type === 'CUSTOMER' && (
               <div className="text-right border-t-2 border-black pt-4">
                 <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Bill Amount</p>
@@ -166,7 +210,7 @@ export default function VendorDashboard() {
 
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* HISTORY View - Financial Settlement Log */}
+        {/* HISTORY View */}
         {view === 'HISTORY' && (
           <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border-2 border-black">
             <div className="bg-black text-white p-6 flex justify-between items-center">
@@ -217,7 +261,7 @@ export default function VendorDashboard() {
           </div>
         )}
 
-        {/* LIVE VIEW - Traditional Cards */}
+        {/* LIVE VIEW */}
         {view === 'LIVE' && filteredOrders.map((order: any) => (
           <div key={order.id} className={`bg-white rounded-[2.5rem] shadow-xl border-l-[12px] p-6 sm:p-8 ${order.status === 'ACCEPTED' ? 'border-green-500' : 'border-orange-500'}`}>
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 uppercase italic">
@@ -259,6 +303,30 @@ export default function VendorDashboard() {
             </div>
           </div>
         ))}
+
+        {/* RESTORED: MENU VIEW */}
+        {view === 'MENU' && menuSettings && (
+           <div className="bg-white rounded-[2.5rem] shadow-xl p-8 border-b-8 border-blue-600 uppercase italic tracking-tighter">
+              <h3 className="text-2xl font-black italic mb-8 border-b-2 border-gray-100 pb-2 uppercase">My Items Pricing</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Object.entries(menuSettings).map(([id, data]: [string, any]) => (
+                  <div key={id} className="bg-zinc-50 p-6 rounded-[2rem] border-2 border-zinc-100 shadow-sm flex flex-col justify-between gap-4">
+                    <div>
+                      <h4 className="font-black text-xl italic uppercase text-zinc-800 tracking-tighter border-b pb-1 mb-2">{id}</h4>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Your Share: <span className="text-blue-600 text-base">Rs. {data.cost}</span></p>
+                    </div>
+                    <button 
+                      onClick={() => setRequestModal({itemId: id, currentCost: data.cost})} 
+                      className="w-full bg-zinc-950 text-white py-3 rounded-2xl font-black text-[9px] tracking-widest uppercase italic hover:bg-blue-600 transition-all shadow-md"
+                    >
+                      Change Price
+                    </button>
+                  </div>
+                ))}
+              </div>
+           </div>
+        )}
+
       </div>
 
       <style jsx global>{`
