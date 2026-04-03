@@ -37,7 +37,7 @@ export default function ApplicationsManager() {
           const password = app.nic ? app.nic.slice(-4) : "1234"; 
           await addDoc(collection(db, 'vendors'), {
             fullName: app.fullName || "No Name",
-            mobilePhone: app.mobilePhone || "0000000000",
+            phone: app.phone || "0000000000", // මෙතන mobilePhone වෙනුවට phone
             nic: app.nic || "N/A",
             district: app.district || "N/A",
             city: app.city || "N/A",
@@ -76,7 +76,7 @@ export default function ApplicationsManager() {
                 <div className="space-y-1">
                   <h3 className="text-xl font-black text-gray-900">{app.fullName || 'Unknown'}</h3>
                   <div className="flex flex-wrap gap-3 text-xs font-bold text-gray-500">
-                    <span className="bg-gray-100 px-3 py-1 rounded-lg">📞 {app.mobilePhone}</span>
+<span className="bg-gray-100 px-3 py-1 rounded-lg">📞 {app.phone}</span>
                     <span className="bg-gray-100 px-3 py-1 rounded-lg">🆔 {app.nic}</span>
                     <span className="bg-gray-100 px-3 py-1 rounded-lg">📍 {app.district} - {app.city}</span>
                   </div>
