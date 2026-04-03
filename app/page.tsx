@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { db } from './firebase'; // Firebase එක මෙතනට ගත්තා
+import { doc, onSnapshot } from 'firebase/firestore'; 
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
-import MyOrders from './components/MyOrders'; // අලුත් component එක ගෙනාවා
+import MyOrders from './components/MyOrders';
 
 export const menuItems = [
   { id: 'kottu', name: { en: 'Kottu', si: 'කොත්තු' }, image: '/image_0.png', type: 'standard' },
@@ -29,12 +31,12 @@ const translations = {
 export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [menuSettings, setMenuSettings] = useState<any>(null); // අලුත්ම මිල ගණන් සඳහා
   
   const [cartItems, setCartItems] = useState<any[]>([]);
-  
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isMyOrdersOpen, setIsMyOrdersOpen] = useState(false); // අලුත් state එක
+  const [isMyOrdersOpen, setIsMyOrdersOpen] = useState(false);
   
   const [portion, setPortion] = useState('Full');
   const [meat, setMeat] = useState('Chicken');
@@ -42,6 +44,14 @@ export default function WeekOutApp() {
   const [curryType, setCurryType] = useState('Chicken');
   const [currySize, setCurrySize] = useState('Gravy Only');
   const [totalPrice, setTotalPrice] = useState(0);
+
+  // 1. මිල ගණන් Firebase එකෙන් සජීවීව (Real-time) ලබා ගැනීම
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'menu'), (doc) => {
+      if (doc.exists()) setMenuSettings(doc.data());
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (selectedItem) {
@@ -53,36 +63,52 @@ export default function WeekOutApp() {
     }
   }, [selectedItem]);
 
+  // 2. මිල ගණනය කිරීමේ ලොජික් එක (Settings මත පදනම්ව)
   useEffect(() => {
     let price = 0;
     if (!selectedItem) return;
 
     const qty = parseInt(itemQty.toString()) || 1;
+    // Admin Settings එකේ ID එක (rice වෙනුවට fried-rice ලෙස තිබේ නම් එය ගළපමු)
+    const settingsId = selectedItem.id === 'rice' ? 'fried-rice' : selectedItem.id;
+    const basePrice = menuSettings?.[settingsId]?.price || 0;
 
     if (selectedItem.type === 'standard') {
-      const stdPrices: any = { Vegi: { Full: 700, Half: 500 }, Fish: { Full: 800, Half: 600 }, Pork: { Full: 900, Half: 700 }, Chicken: { Full: 850, Half: 650 } };
+      // මෙතනදී basePrice ලෙස ගන්නේ Chicken Full මිලයි. අනෙක්වා ඒ අනුව වෙනස් වේ.
+      const stdPrices: any = { 
+        Vegi: { Full: basePrice - 150, Half: basePrice - 350 }, 
+        Fish: { Full: basePrice - 50, Half: basePrice - 250 }, 
+        Pork: { Full: basePrice + 50, Half: basePrice - 150 }, 
+        Chicken: { Full: basePrice, Half: basePrice - 200 } 
+      };
       price = (stdPrices[meat]?.[portion] || 0) * qty;
-    } else if (selectedItem.type === 'biryani') {
-      price = (portion === 'Full' ? 900 : 750) * qty;
-    } else if (selectedItem.type === 'devilled') {
-      const devPrices: any = { Fish: 650, Chicken: 750, Pork: 900 };
+    } 
+    else if (selectedItem.type === 'biryani') {
+      price = (portion === 'Full' ? basePrice : basePrice - 150) * qty;
+    } 
+    else if (selectedItem.type === 'devilled') {
+      const devPrices: any = { Fish: basePrice - 100, Chicken: basePrice, Pork: basePrice + 150 };
       price = (devPrices[meat] || 0) * qty;
-    } else if (selectedItem.type === 'paratha') {
+    } 
+    else if (selectedItem.type === 'paratha') {
       let gravyPrice = 0;
       if (currySize === 'Gravy Only' || curryType === 'White Curry') {
         gravyPrice = (Math.floor(qty / 5) * 100) + ((qty % 5) * 25);
       } else {
-        const curryPrices: any = { Fish: 300, Chicken: 400, Pork: 500 };
+        // කරි වල මිල ගණන්
+        const curryPrices: any = { Egg: 250, Fish: 300, Chicken: 400, Pork: 500 };
         gravyPrice = curryPrices[curryType] || 0;
       }
-      price = (qty * 75) + gravyPrice;
+      // basePrice මෙහිදී පරාටාවක මිල වේ (Admin settings වල පරාටා මිල 75 ලෙස තිබිය යුතුය)
+      price = (qty * (basePrice || 75)) + gravyPrice;
     }
-    setTotalPrice(price);
-  }, [selectedItem, portion, meat, itemQty, curryType, currySize]);
+    
+    // වැරදීමකින් හෝ මිල 0 ට වඩා අඩු වුවහොත් පාලනය කිරීමට
+    setTotalPrice(price > 0 ? price : 0);
+  }, [selectedItem, portion, meat, itemQty, curryType, currySize, menuSettings]);
 
   const handleAddToCart = () => {
     const qty = parseInt(itemQty.toString()) || 1;
-
     const newItem = {
       ...selectedItem,
       name: {
@@ -91,7 +117,6 @@ export default function WeekOutApp() {
       },
       portion, meat, qty: qty, curryType, currySize, price: totalPrice
     };
-    
     setCartItems([...cartItems, newItem]);
     setSelectedItem(null);
     setIsCartOpen(true);
@@ -103,7 +128,6 @@ export default function WeekOutApp() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
-      
       <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-gray-100">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -117,7 +141,6 @@ export default function WeekOutApp() {
               <button onClick={() => setLang('si')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'si' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>සිංහල</button>
             </div>
             
-            {/* අලුත් My Orders බොත්තම */}
             <button onClick={() => setIsMyOrdersOpen(true)} className="px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-zinc-800 text-white hover:bg-orange-600">
                {lang === 'en' ? 'My Orders' : 'ඇණවුම්'}
             </button>
@@ -204,6 +227,7 @@ export default function WeekOutApp() {
                       <option value="Chicken">Chicken (චිකන්)</option>
                       <option value="Fish">Fish (මාළු)</option>
                       <option value="Pork">Pork (පෝක්)</option>
+                      <option value="Egg">Egg (බිත්තර කරි)</option>
                       <option value="White Curry">White Curry (කිරිහොදි)</option>
                     </select>
                   </div>
@@ -223,19 +247,16 @@ export default function WeekOutApp() {
             <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Total Amount</p>
-                <p className="text-2xl font-black text-gray-950">Rs. {totalPrice}.00</p>
+                <p className="text-2xl font-black text-gray-950 font-sans">Rs. {totalPrice}.00</p>
               </div>
-              <button onClick={handleAddToCart} className="px-6 py-3 rounded-full font-bold bg-orange-600 text-white hover:bg-orange-700 shadow-lg transform active:scale-95 transition-all">Add To Cart</button>
+              <button onClick={handleAddToCart} className="px-6 py-3 rounded-full font-bold bg-orange-600 text-white hover:bg-orange-700 shadow-lg transform active:scale-95 transition-all uppercase text-xs tracking-widest">Add To Cart</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* අලුතින් එකතු කරපු My Orders Modal එක */}
       {isMyOrdersOpen && <MyOrders goBack={() => setIsMyOrdersOpen(false)} lang={lang} />}
-
       {isCartOpen && <Cart cartItems={cartItems} removeFromCart={removeFromCart} closeCart={() => setIsCartOpen(false)} lang={lang} openCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} />}
-
       {isCheckoutOpen && <Checkout cartItems={cartItems} subTotal={cartItems.reduce((sum, item) => sum + item.price, 0)} goBack={() => { setIsCheckoutOpen(false); setIsCartOpen(true); }} lang={lang} clearCart={() => { setCartItems([]); setIsCheckoutOpen(false); }} />}
     </div>
   );
