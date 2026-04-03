@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { db } from './firebase'; // Firebase එක මෙතනට ගත්තා
+import { db } from './firebase'; 
 import { doc, onSnapshot } from 'firebase/firestore'; 
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import MyOrders from './components/MyOrders';
 
-export const menuItems = [
+// මෙය අපගේ මූලික මෙනු ආකෘතියයි (Template)
+const baseMenuItems = [
   { id: 'kottu', name: { en: 'Kottu', si: 'කොත්තු' }, image: '/image_0.png', type: 'standard' },
   { id: 'paratha', name: { en: 'Paratha', si: 'පරාටා' }, image: '/image_1.png', type: 'paratha' },
   { id: 'rice', name: { en: 'Fried Rice', si: 'රයිස්' }, image: '/image_2.png', type: 'standard' },
@@ -31,7 +32,8 @@ const translations = {
 export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [menuSettings, setMenuSettings] = useState<any>(null); // අලුත්ම මිල ගණන් සඳහා
+  const [menuSettings, setMenuSettings] = useState<any>(null);
+  const [displayItems, setDisplayItems] = useState<any[]>(baseMenuItems); // සැබෑවටම පෙනෙන ලැයිස්තුව
   
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -45,10 +47,39 @@ export default function WeekOutApp() {
   const [currySize, setCurrySize] = useState('Gravy Only');
   const [totalPrice, setTotalPrice] = useState(0);
 
-  // 1. මිල ගණන් Firebase එකෙන් සජීවීව (Real-time) ලබා ගැනීම
+  // 1. Firebase එකෙන් සජීවීව ඩේටා ගෙන මෙනු එක සකස් කිරීම
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'menu'), (doc) => {
-      if (doc.exists()) setMenuSettings(doc.data());
+    const unsub = onSnapshot(doc(db, 'settings', 'menu'), (docSnap) => {
+      if (docSnap.exists()) {
+        const firebaseMenu = docSnap.data();
+        setMenuSettings(firebaseMenu);
+
+        // 🛡️ මෙතනදී තමයි චීස් කොත්තු වැනි අලුත් ඒවා ඇඩ් වෙන්නේ
+        const finalItems = Object.keys(firebaseMenu).map(key => {
+          // කලින් තිබුණ කෑමක්දැයි බලමු
+          const existing = baseMenuItems.find(m => 
+            m.id.toUpperCase() === key || (m.id === 'rice' && key === 'FRIED-RICE')
+          );
+
+          if (existing) {
+            return { ...existing, firebaseKey: key };
+          }
+
+          // අලුතින් ඇඩ් කරපු එකක් නම් (උදා: CHEES KOTTU)
+          return {
+            id: key.toLowerCase().replace(/\s+/g, '-'),
+            firebaseKey: key,
+            name: { 
+              en: key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '), 
+              si: key.includes('CHEES') ? 'චීස් කොත්තු' : key 
+            },
+            image: key.includes('CHEES') ? '/cheese-kottu.png' : '/image_0.png', // චීස් කොත්තු නම් අලුත් පින්තූරය පෙන්වයි
+            type: 'standard'
+          };
+        });
+
+        setDisplayItems(finalItems);
+      }
     });
     return () => unsub();
   }, []);
@@ -63,18 +94,15 @@ export default function WeekOutApp() {
     }
   }, [selectedItem]);
 
-  // 2. මිල ගණනය කිරීමේ ලොජික් එක (Settings මත පදනම්ව)
+  // 2. මිල ගණනය කිරීමේ ලොජික් එක
   useEffect(() => {
     let price = 0;
-    if (!selectedItem) return;
+    if (!selectedItem || !menuSettings) return;
 
     const qty = parseInt(itemQty.toString()) || 1;
-    // Admin Settings එකේ ID එක (rice වෙනුවට fried-rice ලෙස තිබේ නම් එය ගළපමු)
-    const settingsId = selectedItem.id === 'rice' ? 'fried-rice' : selectedItem.id;
-    const basePrice = menuSettings?.[settingsId]?.price || 0;
+    const basePrice = menuSettings[selectedItem.firebaseKey]?.price || 0;
 
     if (selectedItem.type === 'standard') {
-      // මෙතනදී basePrice ලෙස ගන්නේ Chicken Full මිලයි. අනෙක්වා ඒ අනුව වෙනස් වේ.
       const stdPrices: any = { 
         Vegi: { Full: basePrice - 150, Half: basePrice - 350 }, 
         Fish: { Full: basePrice - 50, Half: basePrice - 250 }, 
@@ -95,15 +123,12 @@ export default function WeekOutApp() {
       if (currySize === 'Gravy Only' || curryType === 'White Curry') {
         gravyPrice = (Math.floor(qty / 5) * 100) + ((qty % 5) * 25);
       } else {
-        // කරි වල මිල ගණන්
         const curryPrices: any = { Egg: 250, Fish: 300, Chicken: 400, Pork: 500 };
         gravyPrice = curryPrices[curryType] || 0;
       }
-      // basePrice මෙහිදී පරාටාවක මිල වේ (Admin settings වල පරාටා මිල 75 ලෙස තිබිය යුතුය)
       price = (qty * (basePrice || 75)) + gravyPrice;
     }
     
-    // වැරදීමකින් හෝ මිල 0 ට වඩා අඩු වුවහොත් පාලනය කිරීමට
     setTotalPrice(price > 0 ? price : 0);
   }, [selectedItem, portion, meat, itemQty, curryType, currySize, menuSettings]);
 
@@ -165,13 +190,14 @@ export default function WeekOutApp() {
           <p className="mt-2 text-lg text-gray-600">Freshly made Sri Lankan delicacies, delivered to your doorstep.</p>
         </div>
 
+        {/* 🥘 මෙන්න මෙතන තමයි සැබෑ ලැයිස්තුව පෙන්වන්නේ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {menuItems.map((item) => (
-            <div key={item.id} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group flex flex-col items-center">
+          {displayItems.map((item) => (
+            <div key={item.id} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group flex flex-col items-center animate-in fade-in zoom-in duration-500">
               <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden mb-5 bg-gray-200">
                 <Image src={item.image} alt={item.name[lang]} fill sizes="(max-w-768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-4">{item.name[lang]}</h3>
+              <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-4 uppercase">{item.name[lang]}</h3>
               <button onClick={() => setSelectedItem(item)} className="w-full mt-auto bg-orange-600 text-white font-bold py-3 px-6 rounded-full hover:bg-orange-700 transition duration-150 shadow-md">
                 {translations.addToCart[lang]}
               </button>
@@ -180,19 +206,20 @@ export default function WeekOutApp() {
         </div>
       </main>
 
+      {/* Popup / Detail View */}
       {selectedItem && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain">
             <button onClick={() => setSelectedItem(null)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 text-xl font-bold">✕</button>
-            <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-6 border-b pb-4">{selectedItem.name[lang]}</h3>
+            <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-6 border-b pb-4 uppercase">{selectedItem.name[lang]}</h3>
 
             <div className="space-y-5">
               {['standard', 'biryani'].includes(selectedItem.type) && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.portion[lang]}</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.portion[lang]}</label>
                   <div className="flex gap-3">
                     {['Full', 'Half'].map((p) => (
-                      <button key={p} onClick={() => setPortion(p)} className={`flex-1 py-2 rounded-xl border-2 font-medium transition-all ${portion === p ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:border-orange-200'}`}>{p}</button>
+                      <button key={p} onClick={() => setPortion(p)} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${portion === p ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>{p}</button>
                     ))}
                   </div>
                 </div>
@@ -200,56 +227,56 @@ export default function WeekOutApp() {
 
               {['standard', 'devilled'].includes(selectedItem.type) && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.meat[lang]}</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.meat[lang]}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {selectedItem.type === 'standard' && <button onClick={() => setMeat('Vegi')} className={`py-2 rounded-xl border-2 font-medium transition-all ${meat === 'Vegi' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Vegi</button>}
+                    {selectedItem.type === 'standard' && <button onClick={() => setMeat('Vegi')} className={`py-2 rounded-xl border-2 font-black transition-all ${meat === 'Vegi' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>Vegi</button>}
                     {['Chicken', 'Fish', 'Pork'].map((m) => (
-                      <button key={m} onClick={() => setMeat(m)} className={`py-2 rounded-xl border-2 font-medium transition-all ${meat === m ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>{m}</button>
+                      <button key={m} onClick={() => setMeat(m)} className={`py-2 rounded-xl border-2 font-black transition-all ${meat === m ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>{m}</button>
                     ))}
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.qty[lang]}</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.qty[lang]}</label>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => setItemQty(Math.max(1, itemQty - 1))} className="w-12 h-12 rounded-xl border-2 border-orange-200 bg-orange-50 flex items-center justify-center text-2xl font-bold text-orange-600 hover:bg-orange-500 hover:text-white transition-all shadow-sm">-</button>
-                  <span className="text-xl font-black w-10 text-center text-gray-900">{itemQty}</span>
-                  <button type="button" onClick={() => setItemQty(itemQty + 1)} className="w-12 h-12 rounded-xl border-2 border-orange-200 bg-orange-50 flex items-center justify-center text-2xl font-bold text-orange-600 hover:bg-orange-500 hover:text-white transition-all shadow-sm">+</button>
+                  <button onClick={() => setItemQty(Math.max(1, itemQty - 1))} className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-2xl font-black text-gray-400 hover:bg-gray-50">-</button>
+                  <span className="text-xl font-black w-10 text-center">{itemQty}</span>
+                  <button onClick={() => setItemQty(itemQty + 1)} className="w-12 h-12 rounded-xl border-2 border-orange-500 flex items-center justify-center text-2xl font-black text-orange-500 hover:bg-orange-50">+</button>
                 </div>
               </div>
 
               {selectedItem.type === 'paratha' && (
-                <>
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.curryType[lang]}</label>
-                    <select value={curryType} onChange={(e) => setCurryType(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-orange-500 focus:outline-none bg-white font-medium text-gray-700">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.curryType[lang]}</label>
+                    <select value={curryType} onChange={(e) => setCurryType(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-3 font-bold">
                       <option value="Chicken">Chicken (චිකන්)</option>
                       <option value="Fish">Fish (මාළු)</option>
                       <option value="Pork">Pork (පෝක්)</option>
-                      <option value="Egg">Egg (බිත්තර කරි)</option>
+                      <option value="Egg">Egg (බිත්තර)</option>
                       <option value="White Curry">White Curry (කිරිහොදි)</option>
                     </select>
                   </div>
                   {curryType !== 'White Curry' && (
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">{translations.currySize[lang]}</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.currySize[lang]}</label>
                       <div className="flex gap-3">
-                        <button onClick={() => setCurrySize('Gravy Only')} className={`flex-1 py-2 rounded-xl border-2 font-medium transition-all ${currySize === 'Gravy Only' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Gravy Only</button>
-                        <button onClick={() => setCurrySize('Full Curry')} className={`flex-1 py-2 rounded-xl border-2 font-medium transition-all ${currySize === 'Full Curry' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600'}`}>Full Curry</button>
+                        <button onClick={() => setCurrySize('Gravy Only')} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${currySize === 'Gravy Only' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-400'}`}>Gravy Only</button>
+                        <button onClick={() => setCurrySize('Full Curry')} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${currySize === 'Full Curry' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-400'}`}>Full Curry</button>
                       </div>
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
 
             <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 font-medium">Total Amount</p>
-                <p className="text-2xl font-black text-gray-950 font-sans">Rs. {totalPrice}.00</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amount</p>
+                <p className="text-2xl font-black text-gray-950">Rs. {totalPrice}.00</p>
               </div>
-              <button onClick={handleAddToCart} className="px-6 py-3 rounded-full font-bold bg-orange-600 text-white hover:bg-orange-700 shadow-lg transform active:scale-95 transition-all uppercase text-xs tracking-widest">Add To Cart</button>
+              <button onClick={handleAddToCart} className="px-8 py-3 rounded-full font-black bg-orange-600 text-white shadow-lg uppercase text-[10px] tracking-widest">Add To Cart</button>
             </div>
           </div>
         </div>
