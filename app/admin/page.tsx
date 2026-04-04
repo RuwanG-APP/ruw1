@@ -21,16 +21,20 @@ export default function AdminControlCenter() {
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         const stat = data.status.toLowerCase();
+        const orderTotal = Number(data.totalAmount || data.totalPrice || 0);
 
-        if (!stat.includes('cancel')) {
-          totalRev += Number(data.totalAmount || 0);
+        // 🛡️ Cancelled Orders වල ලොජික් එක (Cancellation Fee එක ලාභයට එකතු කිරීම)
+        if (stat.includes('cancel')) {
+          totalProfit += (orderTotal * 0.15); 
+          totalRev += (orderTotal * 0.15); // Revenue එකටත් ඒක එකතු වෙන්න ඕනේ
+        } 
+        // 🛡️ සාමාන්‍ය (Active/Completed) Orders වල ලොජික් එක
+        else {
+          totalRev += orderTotal;
           
-          // 💰 දත්ත ගබඩාවේ ඇති ලාභය සෘජුවම ලබා ගැනීම (Number කරලා ආරක්ෂාව වැඩිකර ඇත)
           if (data.adminProfit !== undefined && data.adminProfit !== null) {
             totalProfit += Number(data.adminProfit);
-          }
-          // පැරණි දත්ත තිබේ නම්
-          else {
+          } else {
             totalProfit += Math.round((Number(data.subTotal) || 0) * 0.15);
           }
         }
@@ -76,11 +80,11 @@ export default function AdminControlCenter() {
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-b-8 border-green-500 transform hover:scale-105 transition-transform">
                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Total Revenue (Gross)</p>
-                <h3 className="text-5xl font-black italic text-zinc-900">Rs. {stats.revenue}</h3>
+                <h3 className="text-5xl font-black italic text-zinc-900">Rs. {stats.revenue.toFixed(2)}</h3>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-b-8 border-orange-500 transform hover:scale-105 transition-transform">
                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Net Admin Profit 💰</p>
-                <h3 className="text-5xl font-black italic text-orange-600">Rs. {stats.profit}</h3>
+                <h3 className="text-5xl font-black italic text-orange-600">Rs. {stats.profit.toFixed(2)}</h3>
               </div>
             </div>
             
