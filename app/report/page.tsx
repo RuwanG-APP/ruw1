@@ -1,3 +1,4 @@
+// FILE: app/report/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, orderBy, updateDoc, doc } from "firebase/firestore"; 
@@ -41,10 +42,9 @@ export default function DailyReport() {
   }, [selectedDate]);
 
   const breakdown = orders.reduce((acc, order) => {
-    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන පරිදි මුදල ලබා ගැනීම
     const orderTotal = Number(order.totalPrice || order.totalAmount || 0);
 
-    // ඕඩරය කැන්සල් කරලා නම්, 15% ක ලාභය විතරක් එකතු කරනවා
+    // 🛡️ Cancelled Orders: 15% ක ලාභය
     if (order.status.includes('Cancelled')) {
        acc.cancellationFees += (orderTotal * 0.15);
        return acc;
@@ -52,8 +52,16 @@ export default function DailyReport() {
 
     acc.totalDelivery += Number(order.deliveryFee ?? 0);
     
-    // 🛡️ Fix: මගේ වැරදි කෝඩ් එක නිසා items නැති ඕඩර් ආවොත් crash වීම වැළැක්වීම
-    if (order.items && Array.isArray(order.items)) {
+    // 🛡️ THE FIX: කෙලින්ම Database එකේ තියෙන adminProfit එක පාවිච්චි කිරීම!
+    // අයිටම් කීපයක් තියෙනවා නම්, මුළු adminProfit එක පළමු අයිටම් එකේ නමට බැර කරනවා (පැහැදිලි බව සඳහා)
+    // නැත්නම් 'Legacy Profit' කියලා වෙනම පෙන්නනවා.
+    if (order.adminProfit !== undefined && order.adminProfit !== null) {
+        const profitToAssign = Number(order.adminProfit);
+        const firstItemName = (order.items && order.items.length > 0) ? getBaseName(order.items[0].name) : "GENERAL ORDER";
+        acc.itemProfits[firstItemName] = (acc.itemProfits[firstItemName] || 0) + profitToAssign;
+    } 
+    // 🛡️ පැරණි ඕඩර්ස් (adminProfit නැති ඒවා) සඳහා පමණක් අලුතින් ගණන් හදයි
+    else if (order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
         const baseName = getBaseName(item.name || "");
         const menuKey = Object.keys(menuCosts).find(k => k.toUpperCase().includes(baseName)) || baseName;
@@ -65,6 +73,7 @@ export default function DailyReport() {
         acc.itemProfits[baseName] = (acc.itemProfits[baseName] || 0) + profit;
       });
     }
+
     return acc;
   }, { totalDelivery: 0, itemProfits: {} as Record<string, number>, cancellationFees: 0 });
 
@@ -73,9 +82,7 @@ export default function DailyReport() {
   const totalNetProfit = baseProfit + breakdown.cancellationFees;
 
   const grandTotalAll = orders.reduce((sum, o) => {
-    // 🛡️ Fix: අලුත් සහ පරණ ඕඩර් දෙකටම ගැළපෙන පරිදි මුදල ලබා ගැනීම
     const t = Number(o.totalPrice || o.totalAmount || 0);
-    // කැන්සල් කරපු ඕඩර් වලින් 15% ක් විතරයි Grand Total එකට එකතු වෙන්නේ (Cash in hand)
     if (o.status.includes('Cancelled')) {
       return sum + (t * 0.15);
     }
@@ -212,12 +219,10 @@ export default function DailyReport() {
                   <td className="p-3 uppercase border-r-2 border-black">
                     <b className="text-blue-700 underline block mb-1">{o.customerName}</b>
                     <div className="text-[10px] text-zinc-500 font-bold italic">
-                      {/* 🛡️ Fix: ආරක්ෂිතව items පෙන්වීම */}
                       {o.items && Array.isArray(o.items) ? o.items.map((it:any)=>`${it.qty}x ${it.name ? it.name.replace(/^\d+\s*x\s*/i, '') : ''}`).join(", ") : "No items recorded"}
                     </div>
                   </td>
                   
-                  {/* 🛡️ මෙතන තමයි ඔයා ඉල්ලපු COD/Bank පෙන්වන කොටසයි, 0.00 ප්‍රශ්නය හදපු කොටසයි තියෙන්නේ */}
                   <td className="p-3 text-right bg-zinc-50 border-r-2 border-black">
                     <div className="font-black text-lg text-gray-900">
                       Rs. {Number(o.totalPrice || o.totalAmount || 0).toFixed(2)}
@@ -259,7 +264,6 @@ export default function DailyReport() {
                 </div>
                 ))}
                 
-                {/* අලුතින් ලැබෙන 15% ලාභය වෙනම පෙන්නනවා */}
                 {breakdown.cancellationFees > 0 && (
                   <div className="flex justify-between border-b-2 border-dashed border-red-200 pb-1 font-black uppercase text-xs mt-4 pt-2">
                       <span className="text-red-600">Cancellation Fees (15%)</span>
@@ -284,7 +288,7 @@ export default function DailyReport() {
         </div>
 
         <div className="mt-12 flex justify-center gap-6 no-print border-t-4 border-black pt-8">
-           <button onClick={() => window.location.href='/admin/settings'} className="bg-white border-4 border-black px-8 py-4 font-black text-xs uppercase hover:bg-zinc-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">⚙️ Settings</button>
+           <button onClick={() => window.location.href='/admin'} className="bg-white border-4 border-black px-8 py-4 font-black text-xs uppercase hover:bg-zinc-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">⬅️ Admin Dashboard</button>
            <button onClick={() => window.print()} className="bg-zinc-900 text-white border-4 border-black px-10 py-4 font-black text-xs uppercase shadow-[4px_4px_0px_0px_rgba(249,115,22,1)]">🖨️ Print Report</button>
         </div>
       </div>

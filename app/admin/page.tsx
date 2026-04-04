@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db } from '../firebase'; // Path එක හරියටම බැලුවා, මේක app/admin හි නිසා ../firebase
+import { db } from '../firebase'; 
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import MasterMenuTab from './settings/MasterMenuTab';
 import PriceRequestsTab from './settings/PriceRequestsTab';
@@ -9,7 +9,6 @@ export default function AdminControlCenter() {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'MENU' | 'REQUESTS'>('DASHBOARD');
   const [stats, setStats] = useState({ orders: 0, revenue: 0, profit: 0 });
 
-  // 📊 Dashboard Summary Logic (Profit එකත් ගණනය වෙන අලුත් ලොජික් එක)
   useEffect(() => {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -19,20 +18,20 @@ export default function AdminControlCenter() {
       let totalRev = 0;
       let totalProfit = 0;
       
-snapshot.docs.forEach(doc => {
+      snapshot.docs.forEach(doc => {
         const data = doc.data();
         const stat = data.status.toLowerCase();
 
         if (!stat.includes('cancel')) {
-          totalRev += data.totalAmount || 0;
+          totalRev += Number(data.totalAmount || 0);
           
-          // 💰 දත්ත ගබඩාවේ ඇති ලාභය සෘජුවම ලබා ගැනීම
-          if (data.adminProfit !== undefined) {
-            totalProfit += data.adminProfit;
+          // 💰 දත්ත ගබඩාවේ ඇති ලාභය සෘජුවම ලබා ගැනීම (Number කරලා ආරක්ෂාව වැඩිකර ඇත)
+          if (data.adminProfit !== undefined && data.adminProfit !== null) {
+            totalProfit += Number(data.adminProfit);
           }
-          // පැරණි දත්ත තිබේ නම් පමණක් මෙය ක්‍රියාත්මක වේ
+          // පැරණි දත්ත තිබේ නම්
           else {
-            totalProfit += Math.round((data.subTotal || 0) * 0.15);
+            totalProfit += Math.round((Number(data.subTotal) || 0) * 0.15);
           }
         }
       });
@@ -44,7 +43,6 @@ snapshot.docs.forEach(doc => {
   return (
     <div className="min-h-screen bg-gray-100 font-sans uppercase">
       
-      {/* 🖤 Top Navigation Bar */}
       <div className="bg-zinc-950 text-white p-6 shadow-xl border-b-4 border-red-600 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="text-center md:text-left">
@@ -68,7 +66,6 @@ snapshot.docs.forEach(doc => {
 
       <main className="max-w-7xl mx-auto p-6">
         
-        {/* --- SECTION 1: DASHBOARD SUMMARY --- */}
         {activeTab === 'DASHBOARD' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             
@@ -99,14 +96,12 @@ snapshot.docs.forEach(doc => {
           </div>
         )}
 
-        {/* --- SECTION 2: MASTER MENU (Locked Logic) --- */}
         {activeTab === 'MENU' && (
           <div className="animate-in fade-in duration-500">
             <MasterMenuTab />
           </div>
         )}
 
-        {/* --- SECTION 3: PRICE REQUESTS (Locked Logic) --- */}
         {activeTab === 'REQUESTS' && (
           <div className="animate-in fade-in duration-500">
             <PriceRequestsTab />
