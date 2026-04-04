@@ -47,23 +47,19 @@ export default function MyOrders({ goBack, lang }: any) {
     const currentHour = new Date().getHours();
     const stat = order.status.toLowerCase();
     
-    // 🛡️ Security Check 1: Time restriction
+    // 🛡️ Security Check 1: Time restriction (දවල් 2:00 න් පසු ලොක් වීම)
     if (currentHour >= 14) {
       alert(lang === 'en' ? "Cancellations are only allowed before 2:00 PM." : "ඇණවුම් අවලංගු කළ හැක්කේ ප.ව 2:00 ට පෙර පමණි.");
       return;
     }
 
-    // 🛡️ Security Check 2: Status restriction (Blocks old and new completed orders)
+    // 🛡️ Security Check 2: දැනටමත් ඩිලිවර් කර ඇත්නම් අවලංගු කළ නොහැක
     if (stat.includes('deliver') || stat.includes('handover') || stat.includes('complete')) {
       alert(lang === 'en' ? "This order is already delivered!" : "මෙම ඇණවුම දැනටමත් බෙදාහැර අවසන්ය!");
       return;
     }
-    if (stat.includes('accept')) {
-      alert(lang === 'en' ? "This order is being prepared!" : "මෙම ඇණවුම මේ වන විටත් සකස් කරමින් පවතී!");
-      return;
-    }
     if (stat.includes('cancel')) {
-      return; // Already cancelled, do nothing
+      return; 
     }
     
     const paidAmount = Number(order.totalAmount || 0); 
@@ -122,7 +118,7 @@ export default function MyOrders({ goBack, lang }: any) {
 
         {walletBalance !== null && walletBalance > 0 && (
           <div className="bg-green-100 border-2 border-green-400 text-green-800 p-4 rounded-xl text-center mb-6 font-black shadow-sm">
-             💰 {lang === 'en' ? 'Your Wallet Balance:' : 'ඔබගේ Wallet එකේ ඇති මුදල:'} Rs. {walletBalance}.00
+              💰 {lang === 'en' ? 'Your Wallet Balance:' : 'ඔබගේ Wallet එකේ ඇති මුදල:'} Rs. {walletBalance}.00
           </div>
         )}
 
@@ -130,11 +126,9 @@ export default function MyOrders({ goBack, lang }: any) {
           {orders.map((o, i) => {
             const stat = o.status.toLowerCase();
             const isCancelled = stat.includes('cancel');
-            // Catch both old 'handover' and new 'deliver' statuses
             const isDelivered = stat.includes('deliver') || stat.includes('handover') || stat.includes('complete');
-            const isAccepted = stat.includes('accept');
             
-            // Check if it's past 2:00 PM (14:00)
+            // Check if it's past 2:00 PM (14:00) - 🛡️ මෙය පමණයි දැන් ලොක් කරන්නේ
             const isPast2PM = new Date().getHours() >= 14;
             
             const oPaid = Number(o.totalAmount || 0);
@@ -161,7 +155,7 @@ export default function MyOrders({ goBack, lang }: any) {
                  <div className="w-full text-center bg-gray-100 text-gray-400 border border-gray-200 py-2 rounded-lg font-bold text-xs uppercase tracking-widest mt-2">
                    {isCancelled ? (lang === 'en' ? 'Cancelled' : 'අවලංගු කර ඇත') : (lang === 'en' ? 'Completed' : 'අවසන් කර ඇත')}
                  </div>
-               ) : isPast2PM || isAccepted ? (
+               ) : isPast2PM ? (
                  <div className="w-full text-center bg-orange-100 text-orange-600 border border-orange-200 py-2 rounded-lg font-black text-xs uppercase tracking-widest mt-2 flex items-center justify-center gap-2">
                    👨‍🍳 {lang === 'en' ? 'Preparing (Cannot Cancel)' : 'සකස් කරමින් පවතී (අවලංගු කළ නොහැක)'}
                  </div>
