@@ -8,7 +8,7 @@ import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import MyOrders from './components/MyOrders';
 
-// මෙය අපගේ මූලික මෙනු ආකෘතියයි (Template)
+// මෙය අපගේ මූලික මෙනු ආකෘතියයි
 const baseMenuItems = [
   { id: 'kottu', name: { en: 'Kottu', si: 'කොත්තු' }, image: '/image_0.png', type: 'standard' },
   { id: 'paratha', name: { en: 'Paratha', si: 'පරාටා' }, image: '/image_1.png', type: 'paratha' },
@@ -33,7 +33,7 @@ export default function WeekOutApp() {
   const [lang, setLang] = useState<'en' | 'si'>('en');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [menuSettings, setMenuSettings] = useState<any>(null);
-  const [displayItems, setDisplayItems] = useState<any[]>(baseMenuItems); // සැබෑවටම පෙනෙන ලැයිස්තුව
+  const [displayItems, setDisplayItems] = useState<any[]>(baseMenuItems); 
   
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -54,31 +54,35 @@ export default function WeekOutApp() {
         const firebaseMenu = docSnap.data();
         setMenuSettings(firebaseMenu);
 
-        // 🛡️ මෙතනදී තමයි චීස් කොත්තු වැනි අලුත් ඒවා ඇඩ් වෙන්නේ
-        const finalItems = Object.keys(firebaseMenu).map(key => {
-          // කලින් තිබුණ කෑමක්දැයි බලමු
-          const existing = baseMenuItems.find(m => 
-            m.id.toUpperCase() === key || (m.id === 'rice' && key === 'FRIED-RICE')
-          );
+        const finalItems = baseMenuItems.map(item => {
+           const fbKey = item.id === 'rice' ? 'FRIED-RICE' : item.id.toUpperCase();
+           return {
+              ...item,
+              firebaseKey: fbKey,
+              type: firebaseMenu[fbKey]?.type || item.type // Admin Panel එකේ Type එක ගන්නවා
+           };
+        });
 
-          if (existing) {
-            return { ...existing, firebaseKey: key };
+        Object.keys(firebaseMenu).forEach(key => {
+          const isBaseItem = baseMenuItems.find(m => m.id.toUpperCase() === key || (m.id === 'rice' && key === 'FRIED-RICE'));
+          
+          if (!isBaseItem) {
+            finalItems.push({
+              id: key.toLowerCase().replace(/\s+/g, '-'),
+              firebaseKey: key,
+              name: { 
+                en: key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '), 
+                si: key.includes('CHEES') ? 'චීස් කොත්තු' : key 
+              },
+              image: key.includes('CHEES') ? '/cheese-kottu.png' : '/image_0.png', 
+              type: firebaseMenu[key].type || 'standalone' // 🛡️ අලුත් කෑම වල Type එක නිවැරදිව හඳුනා ගනී
+            });
           }
-
-          // අලුතින් ඇඩ් කරපු එකක් නම් (උදා: CHEES KOTTU)
-          return {
-            id: key.toLowerCase().replace(/\s+/g, '-'),
-            firebaseKey: key,
-            name: { 
-              en: key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '), 
-              si: key.includes('CHEES') ? 'චීස් කොත්තු' : key 
-            },
-            image: key.includes('CHEES') ? '/cheese-kottu.png' : '/image_0.png', // චීස් කොත්තු නම් අලුත් පින්තූරය පෙන්වයි
-            type: 'standard'
-          };
         });
 
         setDisplayItems(finalItems);
+      } else {
+        setDisplayItems(baseMenuItems);
       }
     });
     return () => unsub();
@@ -94,7 +98,7 @@ export default function WeekOutApp() {
     }
   }, [selectedItem]);
 
-  // 2. මිල ගණනය කිරීමේ ලොජික් එක
+  // 2. මිල ගණනය කිරීමේ ලොජික් එක (සතයටම නිවැරදි කර ඇත)
   useEffect(() => {
     let price = 0;
     if (!selectedItem || !menuSettings) return;
@@ -102,22 +106,36 @@ export default function WeekOutApp() {
     const qty = parseInt(itemQty.toString()) || 1;
     const basePrice = menuSettings[selectedItem.firebaseKey]?.price || 0;
 
-    if (selectedItem.type === 'standard') {
+    // 🟢 තනි කෑම සහ බීම වර්ග සඳහා (උදා: Fruit Juice, අච්චාරු)
+    if (selectedItem.type === 'standalone') {
+      price = basePrice * qty;
+    }
+    // 🔵 ප්‍රධාන කෑම සඳහා (උදා: කොත්තු, රයිස්)
+    else if (selectedItem.type === 'standard') {
       const stdPrices: any = { 
         Vegi: { Full: basePrice - 150, Half: basePrice - 350 }, 
         Fish: { Full: basePrice - 50, Half: basePrice - 250 }, 
         Pork: { Full: basePrice + 50, Half: basePrice - 150 }, 
         Chicken: { Full: basePrice, Half: basePrice - 200 } 
       };
-      price = (stdPrices[meat]?.[portion] || 0) * qty;
+      let calcPrice = stdPrices[meat]?.[portion] || basePrice;
+      if (calcPrice <= 0) calcPrice = basePrice; // 🛡️ Rs. 0 දෝෂය වළක්වයි
+      price = calcPrice * qty;
     } 
+    // 🟠 බිරියානි
     else if (selectedItem.type === 'biryani') {
-      price = (portion === 'Full' ? basePrice : basePrice - 150) * qty;
+      let calcPrice = portion === 'Full' ? basePrice : basePrice - 150;
+      if (calcPrice <= 0) calcPrice = basePrice;
+      price = calcPrice * qty;
     } 
+    // 🔴 ඩෙවල්
     else if (selectedItem.type === 'devilled') {
       const devPrices: any = { Fish: basePrice - 100, Chicken: basePrice, Pork: basePrice + 150 };
-      price = (devPrices[meat] || 0) * qty;
+      let calcPrice = devPrices[meat] || basePrice;
+      if (calcPrice <= 0) calcPrice = basePrice;
+      price = calcPrice * qty;
     } 
+    // 🟡 කරි සහිත කෑම (උදා: ඉඳි ආප්ප, පරාටා)
     else if (selectedItem.type === 'paratha') {
       let gravyPrice = 0;
       if (currySize === 'Gravy Only' || curryType === 'White Curry') {
@@ -126,7 +144,8 @@ export default function WeekOutApp() {
         const curryPrices: any = { Egg: 250, Fish: 300, Chicken: 400, Pork: 500 };
         gravyPrice = curryPrices[curryType] || 0;
       }
-      price = (qty * (basePrice || 75)) + gravyPrice;
+      const itemBasePrice = basePrice > 0 ? basePrice : 75; // මිලක් නැතිනම් පමණක් 75ක් ගනී
+      price = (qty * itemBasePrice) + gravyPrice;
     }
     
     setTotalPrice(price > 0 ? price : 0);
@@ -153,29 +172,31 @@ export default function WeekOutApp() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
+      
+      {/* 🖤 Header */}
       <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-gray-100">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">W</div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight hidden sm:block">Week <span className="text-orange-600">Out</span></h1>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-md">W</div>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight hidden sm:block italic uppercase">Week <span className="text-orange-600">Out</span></h1>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-full border">
-              <button onClick={() => setLang('en')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'en' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>EN</button>
-              <button onClick={() => setLang('si')} className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors ${lang === 'si' ? 'bg-orange-600 text-white shadow' : 'text-gray-600'}`}>සිංහල</button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center bg-gray-100 p-1 rounded-full border">
+              <button onClick={() => setLang('en')} className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-colors ${lang === 'en' ? 'bg-orange-600 text-white shadow' : 'text-gray-500'}`}>EN</button>
+              <button onClick={() => setLang('si')} className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-colors ${lang === 'si' ? 'bg-orange-600 text-white shadow' : 'text-gray-500'}`}>සිං</button>
             </div>
             
-            <button onClick={() => setIsMyOrdersOpen(true)} className="px-3 py-1.5 rounded-full text-xs font-bold transition-colors bg-zinc-800 text-white hover:bg-orange-600">
-               {lang === 'en' ? 'My Orders' : 'ඇණවුම්'}
+            <button onClick={() => setIsMyOrdersOpen(true)} className="px-3 sm:px-4 py-2 rounded-full text-[10px] sm:text-xs font-black tracking-widest uppercase transition-colors bg-zinc-900 text-white hover:bg-orange-600 shadow-md">
+               {lang === 'en' ? 'Orders' : 'ඇණවුම්'}
             </button>
 
-            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:text-orange-600 transition">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:text-orange-600 transition bg-white rounded-full shadow-sm border border-gray-100">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 sm:w-7 sm:h-7">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
               </svg>
               {cartItems.length > 0 && (
-                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
                   {cartItems.length}
                 </span>
               )}
@@ -184,21 +205,20 @@ export default function WeekOutApp() {
         </nav>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-extrabold text-gray-950 tracking-tighter">{translations.categoryTitle[lang]}</h2>
-          <p className="mt-2 text-lg text-gray-600">Freshly made Sri Lankan delicacies, delivered to your doorstep.</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-3xl sm:text-5xl font-black text-zinc-950 tracking-tighter uppercase italic">{translations.categoryTitle[lang]}</h2>
+          <p className="mt-2 text-xs sm:text-base font-bold text-gray-500 uppercase tracking-widest">Sri Lankan delicacies, delivered fast.</p>
         </div>
 
-        {/* 🥘 මෙන්න මෙතන තමයි සැබෑ ලැයිස්තුව පෙන්වන්නේ */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8">
           {displayItems.map((item) => (
-            <div key={item.id} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group flex flex-col items-center animate-in fade-in zoom-in duration-500">
-              <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden mb-5 bg-gray-200">
-                <Image src={item.image} alt={item.name[lang]} fill sizes="(max-w-768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
+            <div key={item.id} className="bg-white p-3 sm:p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group flex flex-col items-center animate-in fade-in zoom-in duration-500">
+              <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-2xl overflow-hidden mb-3 sm:mb-5 bg-gray-100">
+                <Image src={item.image} alt={item.name[lang]} fill sizes="(max-w-768px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-4 uppercase">{item.name[lang]}</h3>
-              <button onClick={() => setSelectedItem(item)} className="w-full mt-auto bg-orange-600 text-white font-bold py-3 px-6 rounded-full hover:bg-orange-700 transition duration-150 shadow-md">
+              <h3 className="text-sm sm:text-2xl font-black text-gray-950 tracking-tighter mb-3 sm:mb-4 uppercase text-center leading-tight">{item.name[lang]}</h3>
+              <button onClick={() => setSelectedItem(item)} className="w-full mt-auto bg-orange-600 text-white font-black py-3 sm:py-4 px-2 sm:px-6 rounded-2xl sm:rounded-full hover:bg-orange-700 transition duration-150 shadow-md text-[10px] sm:text-xs uppercase tracking-widest active:scale-95">
                 {translations.addToCart[lang]}
               </button>
             </div>
@@ -206,51 +226,59 @@ export default function WeekOutApp() {
         </div>
       </main>
 
-      {/* Popup / Detail View */}
+      {/* 📱 Mobile Optimized Bottom-Sheet Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border animate-fade-in relative max-h-[90vh] overflow-y-auto overscroll-contain">
-            <button onClick={() => setSelectedItem(null)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-800 text-xl font-bold">✕</button>
-            <h3 className="text-2xl font-bold text-gray-950 tracking-tight mb-6 border-b pb-4 uppercase">{selectedItem.name[lang]}</h3>
-
-            <div className="space-y-5">
+        <div className="fixed inset-0 bg-zinc-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-md border-t-8 border-orange-500 sm:border-t-0 flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in duration-300">
+            
+            <div className="p-6 sm:p-8 pb-4 shrink-0 relative border-b border-gray-100">
+              <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-400 hover:text-black hover:bg-gray-200 transition-all font-black">✕</button>
+              <h3 className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tighter uppercase pr-10 leading-none italic">{selectedItem.name[lang]}</h3>
+            </div>
+            
+            <div className="p-6 sm:p-8 overflow-y-auto overscroll-contain grow space-y-6">
+              
+              {/* 🛡️ 'Standard' සහ 'Biryani' සඳහා පමණක් Portion අහයි */}
               {['standard', 'biryani'].includes(selectedItem.type) && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.portion[lang]}</label>
+                  <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.portion[lang]}</label>
                   <div className="flex gap-3">
                     {['Full', 'Half'].map((p) => (
-                      <button key={p} onClick={() => setPortion(p)} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${portion === p ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>{p}</button>
+                      <button key={p} onClick={() => setPortion(p)} className={`flex-1 py-3 sm:py-4 rounded-2xl border-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all ${portion === p ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>{p}</button>
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* 🛡️ 'Standard' සහ 'Devilled' සඳහා පමණක් Meat Type අහයි */}
               {['standard', 'devilled'].includes(selectedItem.type) && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.meat[lang]}</label>
+                  <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.meat[lang]}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {selectedItem.type === 'standard' && <button onClick={() => setMeat('Vegi')} className={`py-2 rounded-xl border-2 font-black transition-all ${meat === 'Vegi' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>Vegi</button>}
+                    {selectedItem.type === 'standard' && <button onClick={() => setMeat('Vegi')} className={`py-3 sm:py-4 rounded-2xl border-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all ${meat === 'Vegi' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-100 text-gray-400'}`}>Vegi</button>}
                     {['Chicken', 'Fish', 'Pork'].map((m) => (
-                      <button key={m} onClick={() => setMeat(m)} className={`py-2 rounded-xl border-2 font-black transition-all ${meat === m ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-400'}`}>{m}</button>
+                      <button key={m} onClick={() => setMeat(m)} className={`py-3 sm:py-4 rounded-2xl border-2 font-black text-xs sm:text-sm uppercase tracking-widest transition-all ${meat === m ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-100 text-gray-400'}`}>{m}</button>
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* 🛡️ හැම කෑමකටම අදාළ Quantity එක */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.qty[lang]}</label>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setItemQty(Math.max(1, itemQty - 1))} className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-2xl font-black text-gray-400 hover:bg-gray-50">-</button>
-                  <span className="text-xl font-black w-10 text-center">{itemQty}</span>
-                  <button onClick={() => setItemQty(itemQty + 1)} className="w-12 h-12 rounded-xl border-2 border-orange-500 flex items-center justify-center text-2xl font-black text-orange-500 hover:bg-orange-50">+</button>
+                <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.qty[lang]}</label>
+                <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-100 w-max">
+                  <button onClick={() => setItemQty(Math.max(1, itemQty - 1))} className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-2xl font-black text-gray-400 hover:text-orange-600 transition-colors">-</button>
+                  <span className="text-2xl font-black w-10 text-center font-sans text-gray-900">{itemQty}</span>
+                  <button onClick={() => setItemQty(itemQty + 1)} className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-2xl font-black text-orange-500 hover:bg-orange-600 hover:text-white transition-colors">+</button>
                 </div>
               </div>
 
+              {/* 🛡️ 'Paratha' (Curry Based) සඳහා පමණක් හොදි අහයි */}
               {selectedItem.type === 'paratha' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.curryType[lang]}</label>
-                    <select value={curryType} onChange={(e) => setCurryType(e.target.value)} className="w-full border-2 border-gray-200 rounded-xl p-3 font-bold">
+                    <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.curryType[lang]}</label>
+                    <select value={curryType} onChange={(e) => setCurryType(e.target.value)} className="w-full border-2 border-gray-100 bg-gray-50 rounded-2xl p-4 font-black text-sm uppercase tracking-widest focus:border-orange-500 outline-none text-gray-700">
                       <option value="Chicken">Chicken (චිකන්)</option>
                       <option value="Fish">Fish (මාළු)</option>
                       <option value="Pork">Pork (පෝක්)</option>
@@ -260,10 +288,10 @@ export default function WeekOutApp() {
                   </div>
                   {curryType !== 'White Curry' && (
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase">{translations.currySize[lang]}</label>
+                      <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.currySize[lang]}</label>
                       <div className="flex gap-3">
-                        <button onClick={() => setCurrySize('Gravy Only')} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${currySize === 'Gravy Only' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-400'}`}>Gravy Only</button>
-                        <button onClick={() => setCurrySize('Full Curry')} className={`flex-1 py-2 rounded-xl border-2 font-black transition-all ${currySize === 'Full Curry' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-400'}`}>Full Curry</button>
+                        <button onClick={() => setCurrySize('Gravy Only')} className={`flex-1 py-4 rounded-2xl border-2 font-black text-xs uppercase tracking-widest transition-all ${currySize === 'Gravy Only' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-100 text-gray-400'}`}>Gravy Only</button>
+                        <button onClick={() => setCurrySize('Full Curry')} className={`flex-1 py-4 rounded-2xl border-2 font-black text-xs uppercase tracking-widest transition-all ${currySize === 'Full Curry' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-100 text-gray-400'}`}>Full Curry</button>
                       </div>
                     </div>
                   )}
@@ -271,12 +299,12 @@ export default function WeekOutApp() {
               )}
             </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
+            <div className="p-5 sm:p-6 bg-white border-t border-gray-100 shrink-0 flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-10">
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amount</p>
-                <p className="text-2xl font-black text-gray-950">Rs. {totalPrice}.00</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
+                <p className="text-3xl font-black text-gray-950 leading-none italic font-sans">Rs. {totalPrice}</p>
               </div>
-              <button onClick={handleAddToCart} className="px-8 py-3 rounded-full font-black bg-orange-600 text-white shadow-lg uppercase text-[10px] tracking-widest">Add To Cart</button>
+              <button onClick={handleAddToCart} className="px-8 py-4 rounded-2xl sm:rounded-full font-black bg-orange-600 text-white shadow-xl uppercase text-[10px] tracking-widest active:scale-95 transition-transform hover:bg-zinc-900">Add To Cart</button>
             </div>
           </div>
         </div>
