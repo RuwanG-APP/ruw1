@@ -6,9 +6,8 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 export default function MasterMenuTab() {
   const [menuItems, setMenuItems] = useState<any>({});
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ price: 0, cost: 0 });
+  const [editForm, setEditForm] = useState({ price: 0, cost: 0, nameSi: '', type: 'standard' });
 
-  // States for adding a new item (සිංහල නමත් ඇතුළත් කළා)
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', nameSi: '', price: '', cost: '', type: 'standard' });
 
@@ -25,9 +24,22 @@ export default function MasterMenuTab() {
       newMenuData[itemId] = { ...newMenuData[itemId], ...editForm };
       await setDoc(doc(db, 'settings', 'menu'), newMenuData);
       setEditingItem(null);
-      alert("මිල සාර්ථකව යාවත්කාලීන විය!");
+      alert("සාර්ථකව යාවත්කාලීන විය! ✅");
     } catch (err) {
       alert("Error saving item.");
+    }
+  };
+
+  // 🗑️ අලුත් Delete Function එක!
+  const deleteMenuItem = async (itemId: string) => {
+    if (!window.confirm(`ඔබට විශ්වාසද '${itemId}' මෙනුවෙන් ඉවත් කිරීමට අවශ්‍යයි කියා?`)) return;
+    try {
+      const newMenuData = { ...menuItems };
+      delete newMenuData[itemId];
+      await setDoc(doc(db, 'settings', 'menu'), newMenuData);
+      alert("සාර්ථකව ඉවත් කරන ලදී! 🗑️");
+    } catch (err) {
+      alert("Error deleting item.");
     }
   };
 
@@ -46,7 +58,7 @@ export default function MasterMenuTab() {
         price: Number(newItem.price),
         cost: Number(newItem.cost),
         type: newItem.type,
-        nameSi: newItem.nameSi.trim() || newItem.name.trim() // 🛡️ සිංහල නම දුන්නේ නැත්නම් ඉංග්‍රීසි එකම ගන්නවා
+        nameSi: newItem.nameSi.trim() || newItem.name.trim()
       };
 
       await setDoc(doc(db, 'settings', 'menu'), newMenuData);
@@ -88,8 +100,6 @@ export default function MasterMenuTab() {
                 placeholder="FRUIT JUICE"
               />
             </div>
-
-            {/* 🛡️ අලුත් කොටුව: සිංහල නම */}
             <div>
               <label className="text-[9px] font-black text-orange-600 uppercase block mb-1">Name (සිංහල)</label>
               <input 
@@ -99,7 +109,6 @@ export default function MasterMenuTab() {
                 placeholder="ෆෘට් ජූස්"
               />
             </div>
-
             <div>
               <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Category</label>
               <select 
@@ -111,7 +120,6 @@ export default function MasterMenuTab() {
                 <option value="standalone">Standalone (තනි)</option>
               </select>
             </div>
-
             <div>
               <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Selling Price</label>
               <input 
@@ -153,13 +161,30 @@ export default function MasterMenuTab() {
 
             {editingItem === id ? (
               <div className="space-y-4 relative z-10 bg-white p-4 rounded-xl shadow-lg border border-blue-100">
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase">Selling Price</label>
-                  <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black outline-none focus:border-blue-500" />
+                {/* 🛡️ Edit ෆෝම් එකටත් දැන් සිංහල නම සහ Category එක දැම්මා */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-black text-orange-600 uppercase">Name (සිංහල)</label>
+                    <input type="text" value={editForm.nameSi} onChange={e => setEditForm({...editForm, nameSi: e.target.value})} className="w-full bg-gray-50 border-2 border-orange-200 rounded-xl p-3 font-black outline-none focus:border-orange-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-blue-800 uppercase">Category</label>
+                    <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black text-[10px] outline-none focus:border-blue-500">
+                      <option value="standard">Standard</option>
+                      <option value="paratha">Curry Based</option>
+                      <option value="standalone">Standalone</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase">Vendor Cost</label>
-                  <input type="number" value={editForm.cost} onChange={e => setEditForm({...editForm, cost: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black text-blue-600 outline-none focus:border-blue-500" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase">Selling Price</label>
+                    <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase">Vendor Cost</label>
+                    <input type="number" value={editForm.cost} onChange={e => setEditForm({...editForm, cost: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black text-blue-600 outline-none focus:border-blue-500" />
+                  </div>
                 </div>
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => saveMenuItem(id)} className="flex-1 bg-blue-600 text-white font-black py-3 rounded-xl text-[10px] uppercase shadow-md hover:bg-blue-700 transition-all">Save</button>
@@ -176,13 +201,25 @@ export default function MasterMenuTab() {
                   <span className="text-[10px] font-black text-blue-800 uppercase">Vendor Cost:</span>
                   <span className="font-black text-lg text-blue-600 font-sans tracking-tighter">Rs.{data.cost}</span>
                 </div>
-                <button 
-                  onClick={() => { setEditingItem(id); setEditForm({ price: data.price, cost: data.cost }); }}
-                  className="w-full bg-zinc-900 text-white font-black py-3 rounded-xl text-[10px] uppercase mt-4 hover:bg-orange-600 transition-all opacity-0 group-hover:opacity-100 absolute bottom-6 left-0 right-0 mx-6 shadow-xl"
-                  style={{ width: 'calc(100% - 3rem)' }}
-                >
-                  Edit Prices
-                </button>
+                
+                {/* 🛡️ Edit සහ Delete Buttons */}
+                <div className="flex gap-2 w-full absolute bottom-6 left-0 right-0 mx-6 opacity-0 group-hover:opacity-100 transition-all shadow-xl" style={{ width: 'calc(100% - 3rem)' }}>
+                  <button 
+                    onClick={() => { setEditingItem(id); setEditForm({ price: data.price, cost: data.cost, nameSi: data.nameSi || '', type: data.type || 'standalone' }); }}
+                    className="flex-[3] bg-zinc-900 text-white font-black py-3 rounded-xl text-[10px] uppercase hover:bg-orange-600 transition-all"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => deleteMenuItem(id)}
+                    className="flex-1 bg-red-100 text-red-600 font-black py-3 rounded-xl text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all flex items-center justify-center"
+                    title="Delete Item"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
           </div>
