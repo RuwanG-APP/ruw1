@@ -1,8 +1,10 @@
 'use client';
+
+import MasterMenuTab from './settings/MasterMenuTab';
+
 import { useState, useEffect } from 'react';
 import { db } from '../firebase'; 
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import MasterMenuTab from './settings/MasterMenuTab';
 import PriceRequestsTab from './settings/PriceRequestsTab';
 
 export default function AdminControlCenter() {
