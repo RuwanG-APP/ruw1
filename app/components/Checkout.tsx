@@ -1,3 +1,4 @@
+// FILE: app/components/Checkout.tsx
 'use client';
 
 import { useState, useRef } from 'react';
@@ -66,7 +67,7 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
     setIsProcessing(true);
 
     try {
-// 🛡️ Exact Profit Calculation Logic
+      // 🛡️ Exact Profit Calculation Logic
       const menuSnap = await getDoc(doc(db, 'settings', 'menu'));
       const menuData = menuSnap.exists() ? menuSnap.data() : {};
       
@@ -76,12 +77,9 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
         const m = menuData[sId];
         
         if (m && m.cost !== undefined) {
-          // සැබෑ ලාභය = (විකුණන මිල) - (වෙන්ඩර්ගේ පිරිවැය * ප්‍රමාණය)
-          // සටහන: item.price යනු දැනටමත් ප්‍රමාණයෙන් (qty) වැඩිවූ මුළු මිලයි.
           const vendorTotalCost = Number(m.cost) * (item.qty || 1);
           totalAdminProfit += (Number(item.price) - vendorTotalCost);
         } else {
-          // මිල ගණන් නැති වුවහොත් පමණක් 15% ක් ගනී
           totalAdminProfit += Math.round(item.price * 0.15);
         }
       });
@@ -127,9 +125,14 @@ export default function Checkout({ cartItems, subTotal, goBack, clearCart }: any
       message += `❖ City: ${finalCity}\n`;
       message += `❖ Address: ${address}\n\n`;
       message += `*Order Details:*\n`;
+      
       cartItems.forEach((item: any, idx: number) => {
-        message += `${idx + 1}. ${item.qty || 1} x ${item.name.en || item.name} - Rs.${item.price}\n`;
+        // 🛡️ THE FIX: Remove any existing "2 x " prefix from the raw name before appending the new Qty
+        const rawName = item.name?.en || item.name || '';
+        const cleanName = rawName.replace(/^\d+\s*x\s*/i, '').trim(); 
+        message += `${idx + 1}. ${item.qty || 1} x ${cleanName} - Rs.${item.price}\n`;
       });
+
       message += `\n*Billing:*\n`;
       message += `Subtotal: Rs.${subTotal}\n`;
       message += `Delivery Fee: Rs.${deliveryFee}\n`;
