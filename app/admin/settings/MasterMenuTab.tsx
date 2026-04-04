@@ -8,9 +8,9 @@ export default function MasterMenuTab() {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ price: 0, cost: 0 });
 
-  // States for adding a new item
+  // States for adding a new item (අලුතින් type එකත් එක් කළා)
   const [isAdding, setIsAdding] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', price: '', cost: '' });
+  const [newItem, setNewItem] = useState({ name: '', price: '', cost: '', type: 'standard' });
 
   useEffect(() => {
     const unsubMenu = onSnapshot(doc(db, 'settings', 'menu'), (docSnap) => {
@@ -40,18 +40,19 @@ export default function MasterMenuTab() {
       return;
     }
 
-    const itemKey = newItem.name.trim().toUpperCase(); // කෑමේ නම Key එක විදිහට ගන්නවා
+    const itemKey = newItem.name.trim().toUpperCase();
 
     try {
       const newMenuData = { ...menuItems };
       newMenuData[itemKey] = {
         price: Number(newItem.price),
-        cost: Number(newItem.cost)
+        cost: Number(newItem.cost),
+        type: newItem.type // 🛡️ කෑමේ ස්වභාවයත් ඩේටාබේස් එකට සේව් වෙනවා!
       };
 
       await setDoc(doc(db, 'settings', 'menu'), newMenuData);
       setIsAdding(false);
-      setNewItem({ name: '', price: '', cost: '' });
+      setNewItem({ name: '', price: '', cost: '', type: 'standard' });
       alert("අලුත් කෑම වර්ගය සාර්ථකව ඇතුළත් කළා! ✅");
     } catch (err) {
       alert("Error adding new item.");
@@ -79,7 +80,9 @@ export default function MasterMenuTab() {
       {isAdding && (
         <div className="bg-blue-50 p-8 rounded-[2rem] border-2 border-blue-200 mb-8 animate-in zoom-in duration-200">
           <h4 className="font-black text-xl italic mb-6 text-blue-900 tracking-tighter uppercase">Add New Food Item</h4>
-          <form onSubmit={handleAddNewItem} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* 🛠️ ආකෘතියට හානියක් නොවන සේ Grid එක කොටස් 4 කට හැදුවා */}
+          <form onSubmit={handleAddNewItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Item Name (e.g. FISH BUN)</label>
               <input 
@@ -87,10 +90,25 @@ export default function MasterMenuTab() {
                 required
                 value={newItem.name}
                 onChange={e => setNewItem({...newItem, name: e.target.value})}
-                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase"
+                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase text-xs"
                 placeholder="Name"
               />
             </div>
+
+            {/* 🛡️ අලුත්ම Item Category තේරීම */}
+            <div>
+              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Item Category (ස්වභාවය)</label>
+              <select 
+                value={newItem.type}
+                onChange={e => setNewItem({...newItem, type: e.target.value})}
+                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase text-xs text-blue-900 bg-white"
+              >
+                <option value="standard">Standard (ප්‍රධාන කෑම)</option>
+                <option value="paratha">Curry Based (හොදි/කරි සමග)</option>
+                <option value="standalone">Standalone (තනි කෑම / බීම)</option>
+              </select>
+            </div>
+
             <div>
               <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Selling Price (Customer)</label>
               <input 
@@ -98,7 +116,7 @@ export default function MasterMenuTab() {
                 required
                 value={newItem.price}
                 onChange={e => setNewItem({...newItem, price: e.target.value})}
-                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none"
+                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none text-xs"
                 placeholder="0.00"
               />
             </div>
@@ -109,11 +127,12 @@ export default function MasterMenuTab() {
                 required
                 value={newItem.cost}
                 onChange={e => setNewItem({...newItem, cost: e.target.value})}
-                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none"
+                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none text-xs"
                 placeholder="0.00"
               />
             </div>
-            <div className="md:col-span-3 flex gap-3 mt-2">
+            
+            <div className="md:col-span-2 lg:col-span-4 flex gap-3 mt-2">
               <button type="submit" className="flex-1 bg-zinc-950 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Save To System</button>
               <button type="button" onClick={() => setIsAdding(false)} className="px-8 bg-white text-gray-400 font-black py-4 rounded-2xl text-xs uppercase hover:bg-red-50 hover:text-red-600 border border-gray-100 transition-all">Cancel</button>
             </div>
@@ -126,7 +145,11 @@ export default function MasterMenuTab() {
         {Object.entries(menuItems).map(([id, data]: [string, any]) => (
           <div key={id} className="bg-zinc-50 p-6 rounded-[2rem] border-2 border-zinc-200 hover:border-blue-400 transition-all relative group overflow-hidden">
             <div className="mb-4">
-              <h4 className="font-black text-xl italic text-zinc-900 uppercase tracking-tighter">{id}</h4>
+              <h4 className="font-black text-xl italic text-zinc-900 uppercase tracking-tighter leading-none mb-2">{id}</h4>
+              {/* 🏷️ කෑමේ ස්වභාවය පෙන්වන ලස්සන Badge එකක් */}
+              <span className="bg-blue-100 text-blue-800 text-[8px] px-3 py-1 rounded-full uppercase tracking-widest font-black">
+                {data.type === 'standalone' ? '🟢 STANDALONE' : data.type === 'paratha' ? '🟡 CURRY BASED' : '🔵 STANDARD'}
+              </span>
             </div>
 
             {editingItem === id ? (
