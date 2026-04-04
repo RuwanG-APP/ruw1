@@ -1,33 +1,28 @@
-// FILE: app/admin/settings/MasterMenuTab.tsx
-
 'use client';
+
+// ෆයිල් එකේ උඩම තියෙන import එක මේ විදිහට වෙනස් කරන්න
+import MasterMenuTab from './settings/MasterMenuTab';
 
 import React, { useState } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase'; // ඔබේ firebase config එක මෙහි ඇති බව සහතික කරගන්න
-import { Loader2, Check, Image as ImageIcon } from 'lucide-react';
+import { storage } from '@/lib/firebase'; 
+import { Loader2, UploadCloud } from 'lucide-react';
 
 export default function MasterMenuTab() {
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
 
-  // 1. පෙන් එකෙන් හෝ මැෂින් එකෙන් ඉමේජ් එකක් තෝරා අප්ලෝඩ් කරන ෆන්ක්ෂන් එක
   const handleImageBrowse = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     try {
-      // Firebase Storage එකේ 'menu_images' කියන ෆෝල්ඩර් එකට සේව් කරනවා
       const storageRef = ref(storage, `menu_images/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
-      
-      // අප්ලෝඩ් වුනාට පස්සේ ඒකේ ලින්ක් එක (URL) ලබා ගැනීම
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setImageUrl(downloadURL); // ලින්ක් එක ස්ටේට් එකට දානවා
+      const url = await getDownloadURL(snapshot.ref);
+      setImageUrl(url);
     } catch (error) {
-      console.error("Upload error:", error);
-      alert("ඉමේජ් එක අප්ලෝඩ් කිරීම අසාර්ථකයි!");
+      alert("Image upload failed!");
     } finally {
       setUploading(false);
     }
@@ -35,65 +30,70 @@ export default function MasterMenuTab() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-8">
-        <h2 className="text-red-600 text-[10px] font-black italic tracking-[0.3em] mb-6 uppercase">
-          Add New Menu Item
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Name Input */}
+      <div className="bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
+        <h2 className="text-xl font-black italic uppercase mb-8 text-zinc-800">GLOBAL MENU PRICING</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Name English */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Item Name</label>
-            <input className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-red-600" placeholder="CHICKEN KOTTU" />
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Name (English)</label>
+            <input className="w-full bg-blue-50/50 border border-blue-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-400 transition-all" placeholder="FOOD NAME" />
           </div>
 
-          {/* Image Browse Section - මෙන්න ඔයා ඉල්ලපු කොටස */}
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-[10px] font-black text-green-500 uppercase tracking-widest ml-1">
-              Item Image (Browse from Machine/USB)
-            </label>
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <input 
-                  type="text" 
-                  value={imageUrl} 
-                  readOnly
-                  placeholder="Image URL will appear here..."
-                  className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-zinc-500 outline-none"
-                />
-                {imageUrl && <Check className="absolute right-3 top-3 text-green-500 w-4 h-4" />}
-              </div>
+          {/* Name Sinhala */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest ml-1">Name (සිංහල)</label>
+            <input className="w-full bg-orange-50/50 border border-orange-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-orange-400 transition-all" placeholder="සිංහල නම" />
+          </div>
 
-              {/* ඇත්තම Browse බටන් එක */}
-              <label className="bg-red-600 hover:bg-red-700 text-white px-6 rounded-xl text-[10px] font-black flex items-center justify-center cursor-pointer transition-all active:scale-95 whitespace-nowrap min-w-[120px]">
-                {uploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="w-3 h-3" /> BROWSE
-                  </div>
-                )}
-                {/* Hidden File Input */}
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept="image/*" 
-                  onChange={handleImageBrowse} 
-                />
+          {/* Image URL with BROWSE Button */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-green-600 uppercase tracking-widest ml-1">Image URL (පින්තූරය තෝරන්න)</label>
+            <div className="relative group">
+              <input 
+                type="text" 
+                value={imageUrl} 
+                readOnly 
+                className="w-full bg-green-50/50 border border-green-100 rounded-2xl px-5 py-4 text-[10px] font-medium text-zinc-500 outline-none pr-32" 
+                placeholder="https://image-link.com/photo.jpg" 
+              />
+              <label className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-black text-white px-5 rounded-xl text-[10px] font-black flex items-center justify-center cursor-pointer transition-all active:scale-95 shadow-lg">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'BROWSE'}
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageBrowse} />
               </label>
             </div>
           </div>
 
-          {/* Price Input */}
+          {/* Category */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-1">Selling Price</label>
-            <input type="number" className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-red-600" placeholder="0.00" />
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Category</label>
+            <select className="w-full bg-blue-50/50 border border-blue-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none appearance-none cursor-pointer">
+              <option>Standard (Kottu/Rice)</option>
+              <option>Beverages</option>
+            </select>
+          </div>
+
+          {/* Selling Price */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Selling Price</label>
+            <input type="number" className="w-full bg-blue-50/50 border border-blue-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-400" placeholder="0.00" />
+          </div>
+
+          {/* Vendor Cost */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Vendor Cost</label>
+            <input type="number" className="w-full bg-blue-50/50 border border-blue-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-400" placeholder="0.00" />
           </div>
         </div>
 
-        <button className="w-full mt-10 bg-white text-black py-4 rounded-2xl text-[11px] font-black tracking-[0.3em] hover:bg-zinc-200 transition-all shadow-lg">
-          SAVE TO MASTER MENU
-        </button>
+        <div className="flex gap-4">
+          <button className="flex-1 bg-black text-white py-5 rounded-[20px] text-xs font-black tracking-[0.3em] hover:bg-zinc-800 transition-all shadow-xl flex items-center justify-center gap-3">
+            <UploadCloud className="w-4 h-4" /> SAVE ITEM
+          </button>
+          <button className="px-10 bg-white text-zinc-400 border border-zinc-100 py-5 rounded-[20px] text-xs font-black tracking-widest hover:bg-zinc-50 transition-all uppercase">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
