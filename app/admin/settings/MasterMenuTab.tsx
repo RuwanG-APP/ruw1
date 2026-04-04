@@ -8,9 +8,9 @@ export default function MasterMenuTab() {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ price: 0, cost: 0 });
 
-  // States for adding a new item (අලුතින් type එකත් එක් කළා)
+  // States for adding a new item (සිංහල නමත් ඇතුළත් කළා)
   const [isAdding, setIsAdding] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', price: '', cost: '', type: 'standard' });
+  const [newItem, setNewItem] = useState({ name: '', nameSi: '', price: '', cost: '', type: 'standard' });
 
   useEffect(() => {
     const unsubMenu = onSnapshot(doc(db, 'settings', 'menu'), (docSnap) => {
@@ -19,7 +19,6 @@ export default function MasterMenuTab() {
     return () => unsubMenu();
   }, []);
 
-  // Function to save/update an existing item
   const saveMenuItem = async (itemId: string) => {
     try {
       const newMenuData = { ...menuItems };
@@ -32,7 +31,6 @@ export default function MasterMenuTab() {
     }
   };
 
-  // Function to add a completely new item to the menu
   const handleAddNewItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItem.name || !newItem.price || !newItem.cost) {
@@ -47,12 +45,13 @@ export default function MasterMenuTab() {
       newMenuData[itemKey] = {
         price: Number(newItem.price),
         cost: Number(newItem.cost),
-        type: newItem.type // 🛡️ කෑමේ ස්වභාවයත් ඩේටාබේස් එකට සේව් වෙනවා!
+        type: newItem.type,
+        nameSi: newItem.nameSi.trim() || newItem.name.trim() // 🛡️ සිංහල නම දුන්නේ නැත්නම් ඉංග්‍රීසි එකම ගන්නවා
       };
 
       await setDoc(doc(db, 'settings', 'menu'), newMenuData);
       setIsAdding(false);
-      setNewItem({ name: '', price: '', cost: '', type: 'standard' });
+      setNewItem({ name: '', nameSi: '', price: '', cost: '', type: 'standard' });
       alert("අලුත් කෑම වර්ගය සාර්ථකව ඇතුළත් කළා! ✅");
     } catch (err) {
       alert("Error adding new item.");
@@ -65,7 +64,6 @@ export default function MasterMenuTab() {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 border-b-2 border-gray-100 pb-4 gap-4">
         <h3 className="text-2xl font-black italic tracking-tighter">Global Menu Pricing</h3>
         
-        {/* + Add New Item Button */}
         {!isAdding && (
           <button 
             onClick={() => setIsAdding(true)}
@@ -76,64 +74,65 @@ export default function MasterMenuTab() {
         )}
       </div>
 
-      {/* Form to add a NEW item */}
       {isAdding && (
         <div className="bg-blue-50 p-8 rounded-[2rem] border-2 border-blue-200 mb-8 animate-in zoom-in duration-200">
           <h4 className="font-black text-xl italic mb-6 text-blue-900 tracking-tighter uppercase">Add New Food Item</h4>
           
-          {/* 🛠️ ආකෘතියට හානියක් නොවන සේ Grid එක කොටස් 4 කට හැදුවා */}
-          <form onSubmit={handleAddNewItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <form onSubmit={handleAddNewItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
-              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Item Name (e.g. FISH BUN)</label>
+              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Name (English)</label>
               <input 
-                type="text" 
-                required
-                value={newItem.name}
+                type="text" required value={newItem.name}
                 onChange={e => setNewItem({...newItem, name: e.target.value})}
                 className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase text-xs"
-                placeholder="Name"
+                placeholder="FRUIT JUICE"
               />
             </div>
 
-            {/* 🛡️ අලුත්ම Item Category තේරීම */}
+            {/* 🛡️ අලුත් කොටුව: සිංහල නම */}
             <div>
-              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Item Category (ස්වභාවය)</label>
+              <label className="text-[9px] font-black text-orange-600 uppercase block mb-1">Name (සිංහල)</label>
+              <input 
+                type="text" value={newItem.nameSi}
+                onChange={e => setNewItem({...newItem, nameSi: e.target.value})}
+                className="w-full p-4 rounded-xl font-black border-2 border-orange-200 focus:border-orange-500 outline-none text-xs"
+                placeholder="ෆෘට් ජූස්"
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Category</label>
               <select 
-                value={newItem.type}
-                onChange={e => setNewItem({...newItem, type: e.target.value})}
-                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase text-xs text-blue-900 bg-white"
+                value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})}
+                className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none uppercase text-[10px] text-blue-900 bg-white"
               >
-                <option value="standard">Standard (ප්‍රධාන කෑම)</option>
-                <option value="paratha">Curry Based (හොදි/කරි සමග)</option>
-                <option value="standalone">Standalone (තනි කෑම / බීම)</option>
+                <option value="standard">Standard (ප්‍රධාන)</option>
+                <option value="paratha">Curry Based (හොදි)</option>
+                <option value="standalone">Standalone (තනි)</option>
               </select>
             </div>
 
             <div>
-              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Selling Price (Customer)</label>
+              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Selling Price</label>
               <input 
-                type="number" 
-                required
-                value={newItem.price}
+                type="number" required value={newItem.price}
                 onChange={e => setNewItem({...newItem, price: e.target.value})}
                 className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none text-xs"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Vendor Payout (Cost)</label>
+              <label className="text-[9px] font-black text-blue-800 uppercase block mb-1">Vendor Cost</label>
               <input 
-                type="number" 
-                required
-                value={newItem.cost}
+                type="number" required value={newItem.cost}
                 onChange={e => setNewItem({...newItem, cost: e.target.value})}
                 className="w-full p-4 rounded-xl font-black border-2 border-blue-100 focus:border-blue-500 outline-none text-xs"
                 placeholder="0.00"
               />
             </div>
             
-            <div className="md:col-span-2 lg:col-span-4 flex gap-3 mt-2">
-              <button type="submit" className="flex-1 bg-zinc-950 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Save To System</button>
+            <div className="md:col-span-2 lg:col-span-5 flex gap-3 mt-2">
+              <button type="submit" className="flex-1 bg-zinc-950 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Save Item</button>
               <button type="button" onClick={() => setIsAdding(false)} className="px-8 bg-white text-gray-400 font-black py-4 rounded-2xl text-xs uppercase hover:bg-red-50 hover:text-red-600 border border-gray-100 transition-all">Cancel</button>
             </div>
           </form>
@@ -146,10 +145,10 @@ export default function MasterMenuTab() {
           <div key={id} className="bg-zinc-50 p-6 rounded-[2rem] border-2 border-zinc-200 hover:border-blue-400 transition-all relative group overflow-hidden">
             <div className="mb-4">
               <h4 className="font-black text-xl italic text-zinc-900 uppercase tracking-tighter leading-none mb-2">{id}</h4>
-              {/* 🏷️ කෑමේ ස්වභාවය පෙන්වන ලස්සන Badge එකක් */}
-              <span className="bg-blue-100 text-blue-800 text-[8px] px-3 py-1 rounded-full uppercase tracking-widest font-black">
+              <span className="bg-blue-100 text-blue-800 text-[8px] px-3 py-1 rounded-full uppercase tracking-widest font-black mr-2">
                 {data.type === 'standalone' ? '🟢 STANDALONE' : data.type === 'paratha' ? '🟡 CURRY BASED' : '🔵 STANDARD'}
               </span>
+              {data.nameSi && <span className="text-[10px] font-bold text-orange-600">{data.nameSi}</span>}
             </div>
 
             {editingItem === id ? (
@@ -159,7 +158,7 @@ export default function MasterMenuTab() {
                   <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase">Vendor Payout (Cost)</label>
+                  <label className="text-[10px] font-black text-gray-500 uppercase">Vendor Cost</label>
                   <input type="number" value={editForm.cost} onChange={e => setEditForm({...editForm, cost: Number(e.target.value)})} className="w-full bg-gray-50 border-2 border-blue-200 rounded-xl p-3 font-black text-blue-600 outline-none focus:border-blue-500" />
                 </div>
                 <div className="flex gap-2 mt-4">

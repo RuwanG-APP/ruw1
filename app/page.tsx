@@ -59,7 +59,7 @@ export default function WeekOutApp() {
            return {
               ...item,
               firebaseKey: fbKey,
-              type: firebaseMenu[fbKey]?.type || item.type // Admin Panel එකේ Type එක ගන්නවා
+              type: firebaseMenu[fbKey]?.type || item.type 
            };
         });
 
@@ -72,10 +72,10 @@ export default function WeekOutApp() {
               firebaseKey: key,
               name: { 
                 en: key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '), 
-                si: key.includes('CHEES') ? 'චීස් කොත්තු' : key 
+                si: firebaseMenu[key].nameSi || key // 🛡️ සිංහල නම අදිනවා!
               },
               image: key.includes('CHEES') ? '/cheese-kottu.png' : '/image_0.png', 
-              type: firebaseMenu[key].type || 'standalone' // 🛡️ අලුත් කෑම වල Type එක නිවැරදිව හඳුනා ගනී
+              type: firebaseMenu[key].type || 'standalone' 
             });
           }
         });
@@ -98,7 +98,7 @@ export default function WeekOutApp() {
     }
   }, [selectedItem]);
 
-  // 2. මිල ගණනය කිරීමේ ලොජික් එක (සතයටම නිවැරදි කර ඇත)
+  // 2. මිල ගණනය කිරීමේ ලොජික් එක
   useEffect(() => {
     let price = 0;
     if (!selectedItem || !menuSettings) return;
@@ -106,11 +106,9 @@ export default function WeekOutApp() {
     const qty = parseInt(itemQty.toString()) || 1;
     const basePrice = menuSettings[selectedItem.firebaseKey]?.price || 0;
 
-    // 🟢 තනි කෑම සහ බීම වර්ග සඳහා (උදා: Fruit Juice, අච්චාරු)
     if (selectedItem.type === 'standalone') {
       price = basePrice * qty;
     }
-    // 🔵 ප්‍රධාන කෑම සඳහා (උදා: කොත්තු, රයිස්)
     else if (selectedItem.type === 'standard') {
       const stdPrices: any = { 
         Vegi: { Full: basePrice - 150, Half: basePrice - 350 }, 
@@ -119,23 +117,20 @@ export default function WeekOutApp() {
         Chicken: { Full: basePrice, Half: basePrice - 200 } 
       };
       let calcPrice = stdPrices[meat]?.[portion] || basePrice;
-      if (calcPrice <= 0) calcPrice = basePrice; // 🛡️ Rs. 0 දෝෂය වළක්වයි
+      if (calcPrice <= 0) calcPrice = basePrice; 
       price = calcPrice * qty;
     } 
-    // 🟠 බිරියානි
     else if (selectedItem.type === 'biryani') {
       let calcPrice = portion === 'Full' ? basePrice : basePrice - 150;
       if (calcPrice <= 0) calcPrice = basePrice;
       price = calcPrice * qty;
     } 
-    // 🔴 ඩෙවල්
     else if (selectedItem.type === 'devilled') {
       const devPrices: any = { Fish: basePrice - 100, Chicken: basePrice, Pork: basePrice + 150 };
       let calcPrice = devPrices[meat] || basePrice;
       if (calcPrice <= 0) calcPrice = basePrice;
       price = calcPrice * qty;
     } 
-    // 🟡 කරි සහිත කෑම (උදා: ඉඳි ආප්ප, පරාටා)
     else if (selectedItem.type === 'paratha') {
       let gravyPrice = 0;
       if (currySize === 'Gravy Only' || curryType === 'White Curry') {
@@ -144,7 +139,7 @@ export default function WeekOutApp() {
         const curryPrices: any = { Egg: 250, Fish: 300, Chicken: 400, Pork: 500 };
         gravyPrice = curryPrices[curryType] || 0;
       }
-      const itemBasePrice = basePrice > 0 ? basePrice : 75; // මිලක් නැතිනම් පමණක් 75ක් ගනී
+      const itemBasePrice = basePrice > 0 ? basePrice : 75; 
       price = (qty * itemBasePrice) + gravyPrice;
     }
     
@@ -211,6 +206,7 @@ export default function WeekOutApp() {
           <p className="mt-2 text-xs sm:text-base font-bold text-gray-500 uppercase tracking-widest">Sri Lankan delicacies, delivered fast.</p>
         </div>
 
+        {/* 🥘 Mobile-Optimized Grid System */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8">
           {displayItems.map((item) => (
             <div key={item.id} className="bg-white p-3 sm:p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group flex flex-col items-center animate-in fade-in zoom-in duration-500">
@@ -238,7 +234,6 @@ export default function WeekOutApp() {
             
             <div className="p-6 sm:p-8 overflow-y-auto overscroll-contain grow space-y-6">
               
-              {/* 🛡️ 'Standard' සහ 'Biryani' සඳහා පමණක් Portion අහයි */}
               {['standard', 'biryani'].includes(selectedItem.type) && (
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.portion[lang]}</label>
@@ -250,7 +245,6 @@ export default function WeekOutApp() {
                 </div>
               )}
 
-              {/* 🛡️ 'Standard' සහ 'Devilled' සඳහා පමණක් Meat Type අහයි */}
               {['standard', 'devilled'].includes(selectedItem.type) && (
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.meat[lang]}</label>
@@ -263,7 +257,6 @@ export default function WeekOutApp() {
                 </div>
               )}
 
-              {/* 🛡️ හැම කෑමකටම අදාළ Quantity එක */}
               <div>
                 <label className="block text-[10px] font-black text-gray-400 mb-3 uppercase tracking-widest">{translations.qty[lang]}</label>
                 <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-100 w-max">
@@ -273,7 +266,6 @@ export default function WeekOutApp() {
                 </div>
               </div>
 
-              {/* 🛡️ 'Paratha' (Curry Based) සඳහා පමණක් හොදි අහයි */}
               {selectedItem.type === 'paratha' && (
                 <div className="space-y-6">
                   <div>
