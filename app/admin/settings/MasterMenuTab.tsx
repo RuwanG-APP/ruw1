@@ -31,17 +31,18 @@ export default function MasterMenuTab() {
   const [vendorCost, setVendorCost] = useState('');
 
   // 1. Firebase එකෙන් Data ටික Live ලබා ගැනීම (Real-time Fetch)
-  useEffect(() => {
-    const q = query(collection(db, 'master_menu'), orderBy('nameEn', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const menuData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as MenuItem[];
-      setItems(menuData);
-    });
-    return () => unsubscribe();
-  }, []);
+useEffect(() => {
+  // collection name එක නිවැරදි කරන්න
+  const q = query(collection(db, 'settings', 'menu', 'items'), orderBy('nameEn', 'asc'));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const menuData = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as MenuItem[];
+    setItems(menuData);
+  });
+  return () => unsubscribe();
+}, []);
 
   const handleImageBrowse = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
