@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { db, storage } from '../../firebase'; 
+import { db, storage } from '../../firebase';
 import { Loader2, UploadCloud, Edit2, Trash2, X } from 'lucide-react';
 
 interface MenuItem {
