@@ -1,10 +1,6 @@
-// app/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getStorage } from 'firebase/storage'; // මේක උඩින්ම දාන්න
-// දැනට තියෙන initialization එකට පල්ලෙහාවෙන් මේක දාන්න
-export const storage = getStorage(app);
-
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCxEt3yIZRVm9ZA5as-n-37D8cqqQ8BxOw",
@@ -17,9 +13,4 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-
-
-import { getStorage } from 'firebase/storage'; // මේක උඩින්ම දාන්න
-
-// දැනට තියෙන initialization එකට පල්ලෙහාවෙන් මේක දාන්න
 export const storage = getStorage(app);
