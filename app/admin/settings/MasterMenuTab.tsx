@@ -32,14 +32,14 @@ export default function MasterMenuTab() {
 
   // 1. Firebase එකෙන් Data ටික Live ලබා ගැනීම (Real-time Fetch)
 useEffect(() => {
-  // collection name එක නිවැරදි කරන්න
+  // 'settings/menu/items' ලෙස path එක දීම අනිවාර්යයි
   const q = query(collection(db, 'settings', 'menu', 'items'), orderBy('nameEn', 'asc'));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const menuData = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as MenuItem[];
-    setItems(menuData);
+    setItems(menuData); // දැන් අයිටම් ටික ලිස්ට් එකේ පේන්න ගනීවි
   });
   return () => unsubscribe();
 }, []);
